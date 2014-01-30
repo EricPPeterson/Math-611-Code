@@ -1,0 +1,110 @@
+##Problem 3
+#part a
+set.seed(123)
+a = 3/pi
+M = 4
+fx = function(x){
+  a/(1+x^6)
+}
+q = seq(0,5, length = 1e5)
+b = fx(q)
+
+curve( (a/(1+x^6)), from = 0, to = 3, main = "Plot of X pdf", ylab = "pdf of X", ylim = c(0,1.5), col = "blue", lwd = 1)
+curve(abs(M*dcauchy(x, 0, 1)), add = T, col = "red", lwd = 1 )
+legend("topright", legend=c("f(x)", "M*g(x)"), lty=c(1,2), col=c("blue", "red"), bty="n",cex=0.8)
+
+##rejection algo
+set.seed(123)
+K <- 1e6; x.rs <-rep(NA,K); accept <- rep(NA,K)
+
+for(i in 1:K) {
+  x.prop = abs(rcauchy(1, location = 0, scale = 1))
+  u = runif(1)
+  if(u < fx(x.prop)/(M*dcauchy(x.prop, location = 0, scale = 1))) {
+    x.rs[i] = x.prop
+    accept[i] = 1} else {
+    accept[i]= 0 }
+}
+
+x.plot <- x.rs[accept == 1]
+
+plot(y = b, x = q, type = "l", main = "Plot of pdf of target function", ylab = "pdf of target function", xlab = "x", ylim = c(0,1.2), xlim = c(0,5), col = "blue", lwd = 1)
+lines(density(x.plot), type = "l",  col = "red", lwd = 1 )
+legend("topright", legend=c("f(x)", "M*g(x)"), lty=c(1,2), col=c("blue", "red"), bty="n",cex=0.8)
+
+#part b
+E_X = mean(x.plot)
+E_X
+#ans = 0.5770293
+
+#confidence interval
+lower = E_X - (sd(x.plot)*1.96)/(length(x.plot)^.5)
+avg = E_X
+upper = E_X + (sd(x.plot)*1.96)/(length(x.plot)^.5)
+
+cat(lower, avg, upper)
+
+sq = x.plot^2
+E_Xsq = mean(sq)
+E_Xsq
+#ans = 0.498924
+
+#confidence interval
+lower2 = E_Xsq - (sd(x.plot)*1.96)/(length(x.plot)^.5)
+avg2 = E_Xsq
+upper2 = E_Xsq + (sd(x.plot)*1.96)/(length(x.plot)^.5)
+
+cat(lower2, avg2, upper2)
+
+#part c
+sqrt = (x.plot)^.5
+E_Xsqrt = mean(sqrt)
+E_Xsqrt
+#ans = 0.7069955
+
+#confidence interval
+lower3 = E_Xsqrt - ((sd(sqrt)/(4*length(x.plot)*mean(sqrt))*1.96))
+avg3 = E_Xsqrt
+upper3 = E_Xsqrt + ((sd(sqrt)/(4*length(x.plot)*mean(sqrt))*1.96))
+
+cat(lower3, avg3, upper3)
+
+#Problem 4
+set.seed(1)
+t = 1e6
+trans_mat = matrix(NA, 3, 3)
+for (i in 1:3){
+  trans_mat[i,] = sample(1:10,3)
+  
+  if (sum(trans_mat[i,]) != 1){
+    trans_mat[i,] = trans_mat[i,]/sum(trans_mat[i,])
+  }
+}
+trans_mat
+init_state = 1
+
+Marky = function(T,P,X_naught){
+  state = X_naught;
+  collect_states = rep(NA,T)
+
+  # Make T steps through the markov chain
+  for (j in 1:T)
+  {
+    new_State = sample(1:ncol(P), 1, prob = P[state,])
+    state = new_State;
+    collect_states[j] = state
+  }
+  A = sum(collect_states[collect_states == 1])
+  B = sum(collect_states[collect_states == 2]/2)
+  C = sum(collect_states[collect_states ==3]/3)
+  cat("total state 1:", paste(A),"\n")
+  cat("total state 2:", paste(B),"\n")
+  cat("total state 3:", paste(C),"\n")
+  cat("pct in state 1:", paste(A/(A+B+C)),"\n")
+  cat("pct in state 2:", paste(B/(A+B+C)),"\n")
+  cat("pct in state 3:", paste(C/(A+B+C)),"\n")
+}
+
+start.time = Sys.time()
+Marky(t,trans_mat,init_state)
+Sys.time() - start.time
