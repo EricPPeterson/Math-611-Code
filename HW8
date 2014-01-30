@@ -1,0 +1,164 @@
+##HW 8
+##problem 2
+##part b
+
+n <- 100
+pi1 <- .3
+pi2 <- (1 - pi1)
+mean1 <- 1
+mean2 <- 3
+sd1 <- 1
+sd2 <- sqrt(1.5)
+X <- rep(NA, n)
+
+set.seed(100)
+for (i in 1:n){
+  U <- runif(1)
+    if(U <= pi1){
+        X[i] <- rnorm(1, mean = mean1, sd = sd1)
+        } else {
+        X[i] <- rnorm(1, mean = mean2, sd = sd2)  
+    }
+}
+
+#part c
+prob <- seq(from = 0.01, to = 1, by = 0.01)
+MLEpi <- matrix(data = NA, nrow = n, ncol = n)
+
+for (i in 1:n){
+  for(j in 1:n){
+  MLEpi[j,i] <- prob[i] * (1/(2*sqrt(2*pi*sd1))) * exp(-(X[j] - mean1)^2/(2*sd1^2)) + (1 - prob[i]) * (1/(2*sqrt(2*pi*sd2))) * exp(-(X[j] - mean2)^2/(2*sd2^2))
+  }
+}
+
+MLE <- rep(NA, n)
+
+for (i in 1:n){
+  MLE[i] <- prod(MLEpi[,i])
+}
+
+plot(y = MLE, x = prob,  type = "l", main = "MLE graph", xlab = expression(Pi))
+max(MLE)
+##[1] 2.199388e-108
+which(MLE > 2.19e-108)
+##[1] 33
+
+
+##part d ii
+p1 <- 0.50
+relax <- 5e3
+accept <- rep(NA, relax)
+
+for (i in 1:relax){
+  U <- runif(1)
+  p2 <- (p1 + rnorm(1,0,.1)) %% 1
+  Post <- prod((p1 * (1/(2*sqrt(2*pi*sd1))) * exp(-(X - mean1)^2/(2*sd1^2)) + 
+                 (1 - p1) * (1/(2*sqrt(2*pi*sd2))) * exp(-(X - mean2)^2/(2*sd2^2))))
+  Prop <- prod((p2 * (1/(2*sqrt(2*pi*sd1))) * exp(-(X - mean1)^2/(2*sd1^2)) + 
+                 (1 - p2) * (1/(2*sqrt(2*pi*sd2))) * exp(-(X - mean2)^2/(2*sd2^2))))
+  if(U < min(1,Prop/Post)){
+      p1 <- p2
+      accept[i] <- p1
+  } else {
+      p1 <- p1
+      accept[i] <- p1
+  }
+}
+plot(accept, type = "l", main = "Markov Chain", xlab = "Starting Point = 0.50")
+
+plot(density(accept), main = "Metropolis Hastings", xlab = expression(Pi))
+
+##d iii
+
+#part c
+newPrior <- rep(NA, n)
+
+for (i in 1:n){
+  newPrior[i] <- MLE[i] * 6*prob[i]^5
+}
+
+plot(density(newPrior), main = "MLE with prior 6Pi^5")
+
+##problem 3
+##part b
+o_ring_data <- read.table("C:/Users/eric/Desktop/GTown Stats/math 611/HW8/o_ring_data.txt", header=T, quote="\"")
+attach(o_ring_data)
+
+like <- function(AlphaBeta) {
+  likey <- rep(NA, nrow(o_ring_data))
+  for (i in 1:nrow(o_ring_data)){
+    T <- Temp
+    P_alpha_beta <- exp(AlphaBeta[1] + T[i] * AlphaBeta[2])/(1 + exp(AlphaBeta[1] + T[i] * AlphaBeta[2]))
+    likey[i] <- -log((P_alpha_beta * o_ring_data[i,2]) + (1 - P_alpha_beta) * 
+                        (1 - o_ring_data[i,2]))
+  }
+  return(sum(likey))
+}
+
+maxMLE <- nlm(like, p = c(0,0))
+##$minimum
+##[1] 10.1576
+##$estimate
+##[1] 15.0434264 -0.2321705
+##$gradient
+##[1] 5.659903e-08 1.337792e-06
+
+##part c/d
+like <- function(alpha, beta) {
+  likey <- rep(NA, nrow(o_ring_data))
+  for (i in 1:nrow(o_ring_data)){
+    T <- Temp
+    P_alpha_beta <- exp(alpha + 65 * beta)/(1 + exp(alpha + 65 * beta))
+    ##P_alpha_beta <- exp(alpha + T[i] * beta)/(1 + exp(alpha + T[i] * beta))
+    likey[i] <- -log((P_alpha_beta * o_ring_data[i,2]) + (1 - P_alpha_beta) * 
+                       (1 - o_ring_data[i,2]))
+  }
+  return(sum(likey))
+}
+
+
+alpha <- 15
+beta <- -.50
+runs <- 1e5
+accept <- matrix(data = NA, nrow = runs, ncol = 2)
+accepted <- 0
+rejected <- 0
+
+for (i in 1:runs){
+  U <- runif(1)
+  alphaProp <- rtnorm(1, mean = 15, sd = .5, lower = -14, upper = 16)
+  betaProp <- rtnorm(1, mean = -.25, sd = 0.2, lower = -1, upper = 0)
+  Post <- like(alpha, beta) * alpha * beta
+  Prop <- like(alphaProp, betaProp) * alphaProp * betaProp 
+  if(U < min(1, Prop/Post)){
+    alpha <- alphaProp
+    beta <- betaProp
+    accept[i,1] <- alpha
+    accept[i,2] <- beta
+    accepted <- accepted + 1
+  } else {
+    accept[i,1] <- alpha
+    accept[i,2] <- beta
+    rejected <- rejected + 1
+  }
+  cat(i, "\n")
+}
+
+plot(density(accept[,1]), main = "Density Alpha")
+plot(density(accept[,2]), main = "Density Beta")
+accepted
+rejected
+
+##> accepted
+##[1] 42007
+##> rejected
+##[1] 57993
+##> mean(accept[,2])
+##[1] -0.4742158
+##> mean(accept[,1])
+##[1] 14.9762
+
+posterior1 <- exp(accept[1,] + accept[2,] * 65)/(1 + exp(accept[1,] + accept[,2]) * 65)
+plot(density(posterior1))
+posterior2 <- exp(accept[1,] + accept[2,] * 45)/(1 + exp(accept[1,] + accept[,2]) * 45)
+plot(density(posterior2))
