@@ -1,0 +1,302 @@
+##HW 11 Problem 1
+require(ggplot2)
+require(msm)
+
+GDP_data2 <- read.table("C:/Users/eric/Desktop/GTown Stats/math 611/HW10/GDP_data2.csv", quote="\"")
+GDP <- rep(NA, nrow(GDP_data2))
+
+##part a
+GDP[1] <- 0
+sum.chain <- rep(0, length (GDP))
+qtr = gl(4,1,136)
+yr = as.numeric( gl(36,4,136) ) + 1950
+yrQ = cbind( yr, qtr, GDP)
+
+for (k in 2:nrow(GDP_data2)){
+  GDP[k] <- 100 * (log(GDP_data2[k, 1]) - log(GDP_data2[(k-1), 1])) 
+}
+
+##plots for GDP, and growth rate
+
+qplot(y = GDP_data2[,1], x = yr, type = "l", main = "Raw GDP", ylab = "Total GDP in Trillions")
+qplot(y = GDP, x = yr, type = "l", main = "GDP growth rate", ylab = "Growth rate Percentage")
+
+
+mat <- matrix(data = 0, nrow = length(GDP), ncol = length(GDP))
+old.chain <- matrix(data = 1, nrow = length(GDP))
+flips <- 1e6
+burn <- 50000
+
+#parameters
+alpha <- c(-0.3577, 1.522)
+p <- 0.9049
+q <- 0.7550
+sigma <- 0.7690
+phi <- c( -0.213,  -0.247, -0.058, 0.014, 1)
+prob.chain <- rep(p, nrow(mat))
+accept <- 0
+reject <- 0
+
+#setup matrix for calcing Z(t)
+for (k in 1:nrow(mat)){
+  if (k <= 5){mat[k, 1:5]  = phi
+  } else {
+    mat[k,(k-4):k] = phi
+  }
+}
+
+#function for calcing error
+e <- function(m, s, x, rate, point){
+  Z <- rep(NA, 5) 
+  count <- rev(seq(from = (point - 4), to = point, by = 1))
+  for (j in 1:5){
+    Z[j] <- x[count[1], count[j]]*(m[count[j]] - rate[1] - (rate[2] * s[count[j]]))
+  }
+  e0 <- Z[1] - Z[2] - Z[3] - Z[4] - Z[5]
+  return(e0)
+}
+
+start <- Sys.time()
+
+##HMM flipping one state at a time
+for (num in 1:flips){
+  W <- sample((5:135), 1)
+  
+  new.state <- ifelse(old.chain[W] == 1, 0, 1)
+  new.chain <- old.chain 
+  new.chain[W,] <- new.state
+  
+  old.chain.prob <- c(prob.chain[W], prob.chain[W+1])
+  
+  ##check state|state-1 probabilities for hidden state
+  new.chain.prob <- rep(NA, 2)
+  if(new.chain[W] == new.chain[W-1]){
+    new.chain.prob[1] <- ifelse(new.chain[W] == 1, p, q)
+  }
+  if(new.chain[W] != new.chain[W-1]){
+    new.chain.prob[1] <- ifelse(new.chain[W] == 0, 1-p, 1-q)
+  }
+  if(new.chain[W+1] == new.chain[W]){
+    new.chain.prob[2] <- ifelse(new.chain[W+1] == 1, p, q)
+  }
+  if(new.chain[W+1] != new.chain[W]){
+    new.chain.prob[2] <- ifelse(new.chain[W] == 0, 1-q, 1-p)
+  }
+  
+  ##calculate error for old chain and new chain states
+  e.new <- e(GDP, new.chain, mat, alpha, W)
+  e.old <- e(GDP, old.chain, mat, alpha, W)
+  
+  #calc likelihoods
+  like.new <- prod(new.chain.prob) * dnorm(e.new, mean = 0, sd = sigma)
+  like.old <- prod(old.chain.prob) * dnorm(e.old, mean = 0, sd = sigma)
+  
+  ##check proposal versus old distribution
+  U <- runif(1)
+  if(U < like.new/like.old){
+    old.chain <- new.chain
+    prob.chain[W] <- new.chain.prob[1]
+    prob.chain[W+1] <- new.chain.prob[2]
+    accept <- accept + 1
+  } else {
+    reject <- reject + 1
+  }
+  cat(num, "\n")
+  if(num > burn){
+    sm.chain <- sum.chain
+    sum.chain <- ifelse(old.chain == 1, 0, 1) + sm.chain
+  }
+}
+Sys.time() - start
+
+sum.chain <- sum.chain/(num - burn)
+accpt_pct <- accept/(num - burn)
+##[1] 0.1122553
+recPlot <- cbind(yrQ[5:136,1], sum.chain[5:136])
+plot(y = recPlot[,2], x = recPlot[,1], type = "l", main = "Time Percentage in Recession", ylab = "Percentage", xlab = "Year")
+plot(recPlot[,2], type = "l", main = "Time Percentage in Recession", ylab = "Percentage", xlab = "Year")
+qplot(y = recPlot[,2], x = recPlot[,1], type = "l", main = "Time Percentage in Recession", ylab = "Percentage", xlab = "Year")
+
+which(sum.chain > .50)
+
+##[1]  11  12  13  14  25  26  27  28  29  38  39  40  75  76  77  78  79  80  93  94
+##[21]  95  96  97 116 117 118 119 122 123 124 125 126 127 128
+
+##problem 1 
+## part b
+chain <- rep(data = 1, 136)
+like.chain <- cbind(GDP, old.chain)
+like.chain.new <- like.chain
+colnames(like.chain) <- colnames(like.chain.new) <- c("GDP", "CurrentState")
+
+likey <- function(param){
+  s <- rep(NA, nrow(GDP_data2) - 4)
+  e <- rep(NA, nrow(GDP_data2) - 4)
+  for (i in 5:nrow(GDP_data2)){
+    if(like.chain[i, 2] == 1 & like.chain[(i-1), 2] == 1){P = param[1]}
+    if(like.chain[i, 2] == 0 & like.chain[(i-1), 2] == 0){P = param[2]}
+    if(like.chain[i, 2] == 1 & like.chain[(i-1), 2] != 1){P = (1 - param[2])}
+    if(like.chain[i, 2] == 0 & like.chain[(i-1), 2] != 0){P = (1 - param[1])}
+    
+    Z <- rep(NA, 5)  
+    Z[1] <- like.chain[i, 1] - param[3] - param[4] * like.chain[i,2]
+    for (j in 1:4){
+      Z[(j + 1)] <- param[(j + 4)] * (like.chain[(i-j),1] - param[3] - param[4] * like.chain[(i - j),2])
+    }
+    z <- Z[1] - Z[2] - Z[3] - Z[4] - Z[5]
+    s[(i-4)] = P
+    e[(i - 4)] = dnorm(z, mean = 0, sd = param[9]) 
+  }
+  
+  e0 <- -log(e)
+  s0 <- -log(s)
+  like <- sum(s0) + sum(e0)
+  return(like) 
+}
+
+p1 = 0.5
+q1 = 0.5
+alpha1 = 0.0
+alpha2 = 1
+phi1 = 0
+phi2 = 0
+phi3 = 0
+phi4 = 0
+sig1 = 0.5
+params = c(p1, q1, alpha1, alpha2, phi1, phi2, phi3, phi4, sig1)
+maxMLE <- nlm(likey, params)
+
+##$estimate
+##[1]  0.901960319  0.666666311 -0.308415149  1.502649195  0.112489127 -0.009740693
+##[7] -0.181511604 -0.148091907  0.874107347
+
+
+
+##part c
+priorP <- 0.9019
+priorQ <- 0.6666
+priorAlpha0 <- -0.3084
+priorAlpha1 <- 1.50264
+priorPhi1 <- 0.112
+priorPhi2 <- -0.009
+priorPhi3 <- -0.1815
+priorPhi4 <- -0.1480
+priorSigma <- 0.8741
+accept <- 0
+
+chain <- rep(0, 136)
+lk.chain <- cbind(GDP, chain)
+lk.chain.2 <- lk.chain
+colnames(lk.chain) <- colnames(lk.chain.2) <- c("GDP", "CurrentState")
+
+
+likey <- function(p,q,a0,a1,phi1,phi2,phi3,phi4,sig){
+  
+  s <- rep(NA, nrow(GDP_data2) - 4)
+  e <- rep(NA, nrow(GDP_data2) - 4)
+  for (i in 5:nrow(GDP_data2)){
+    if(lk.chain[i, 2] == 1 & lk.chain[(i-1), 2] == 1){P <- p}
+    if(lk.chain[i, 2] == 0 & lk.chain[(i-1), 2] == 0){P <- q}
+    if(lk.chain[i, 2] == 1 & lk.chain[(i-1), 2] != 1){P <- (1 - q)}
+    if(lk.chain[i, 2] == 0 & lk.chain[(i-1), 2] != 0){P <- (1 - p)}
+    
+    Z <- rep(NA, 5)  
+    Z[1] <- lk.chain[i, 1] - a0 - (a1 * lk.chain[i,2])
+    Z[2] <- phi1 * (lk.chain[(i - 1),1] - a0 - (a1 * lk.chain[(i - 1),2]))
+    Z[3] <- phi2 * (lk.chain[(i - 2),1] - a0 - (a1 * lk.chain[(i - 2),2]))
+    Z[4] <- phi3 * (lk.chain[(i - 3),1] - a0 - (a1 * lk.chain[(i - 3),2]))
+    Z[5] <- phi4 * (lk.chain[(i - 4),1] - a0 - (a1 * lk.chain[(i - 4),2]))
+                                     
+    z <- Z[1] - Z[2] - Z[3] - Z[4] - Z[5]
+    s[(i - 4)] <- P
+    e[(i - 4)] <- dnorm(z, mean = 0, sd = sig, log = T) 
+  }
+  
+  like <- sum(log(s)) + sum(e)
+  return(like) 
+}
+
+runs <- 1e7
+burn <- 1e6
+
+Acc <- likey(priorP, priorQ, priorAlpha0, priorAlpha1, priorPhi1, priorPhi2, priorPhi3, priorPhi4, priorSigma)
+        
+pchain <- c()
+qchain <- c()
+a0chain <- c()
+a1chain <- c()
+phi1chain <- c()
+phi2chain <- c()
+phi3chain <- c()
+phi4chain <- c()
+sigmachain <- c()
+
+for (j in 1:runs){
+  
+  lk.chain[,2] <- lk.chain.2[,2]
+  W <- sample(5:135, 2)
+  new.state <- ifelse(lk.chain[W,2] == 1, 0, 1)
+  lk.chain[W,2] <- new.state  
+  
+  newP <- runif(1) 
+  newQ <- runif(1)
+  newAlp0 <- rtnorm(1, mean = priorAlpha0, sd = 0.005, lower = -1, upper = 1)
+  newAlp1 <- rtnorm(1, mean = priorAlpha1, sd = 0.005, lower = 1, upper = 2)
+  newPhi1 <- rtnorm(1, mean = priorPhi1, sd = 0.005, lower = -0.50, upper = 0.50)
+  newPhi2 <- rtnorm(1, mean = priorPhi2, sd = 0.005, lower = -0.50, upper = 0.50)
+  newPhi3 <- rtnorm(1, mean = priorPhi3, sd = 0.005, lower = -0.50, upper = 0.50)
+  newPhi4 <- rtnorm(1, mean = priorPhi4, sd = 0.005, lower = -0.50, upper = 0.50)
+  newSigma <- rtnorm(1, mean = priorSigma, sd = 0.01, lower = 0, upper = 2)
+    
+  Prop <- likey(newP, newQ, newAlp0, newAlp1, newPhi1, newPhi2, newPhi3, newPhi4, newSigma)
+  
+  logU <- log(runif(1))
+  if (logU < Prop - Acc) {
+    
+    lk.chain.2 <- lk.chain
+    Acc <- Prop
+    
+    } else {
+    
+    lk.chain <- lk.chain.2
+  
+    }
+  
+  if(j > burn & logU < (Prop - Acc)) {
+    
+    accept <- accept + 1
+    
+    pchain <- c(pchain, newP)
+    qchain <- c(qchain, newQ)
+    a0chain <- c(a0chain, newAlp0)
+    a1chain <- c(a1chain, newAlp1)
+    phi1chain <- c(phi1chain, newPhi1)
+    phi2chain <- c(phi2chain, newPhi2)
+    phi3chain <- c(phi3chain, newPhi3)
+    phi4chain <- c(phi4chain, newPhi4)
+    sigmachain <- c(sigmachain, newSigma)
+  }
+    
+  cat(j, "\n")
+}
+
+accpt_pct <- accept/(j - burn)
+pmean <- mean(pchain)
+qmean <- mean(qchain)
+a0mean <- mean(a0chain)
+a1mean <- mean(a1chain)
+phi1mn <- mean(phi1chain)
+phi2mn <- mean(phi2chain)
+phi3mn <- mean(phi3chain)
+phi4mn <- mean(phi4chain)
+sigmn <- mean(sigmachain)
+
+hist(pchain, breaks = 100, xlab = "p distribution", ylab = "frequency", main = "Distribution of P-value")
+hist(qchain, breaks = 100, xlab = "q distribution", ylab = "frequency", main = "Distribution of Q-value")
+hist(a0chain, breaks = 100, xlab = "Recession Alpha", ylab = "frequency", main = "Distribution of Alpha 0")
+hist(a1chain, breaks = 100, xlab = "Expansion Alpha", ylab = "frequency", main = "Distribution of Alpha 1")
+hist(phi1chain, breaks = 100, xlab = "Phi 1", ylab = "frequency", main = "Distribution of Phi 1")
+hist(phi2chain, breaks = 100, xlab = "Phi 2", ylab = "frequency", main = "Distribution of Phi 2")
+hist(phi3chain, breaks = 100, xlab = "Phi 3", ylab = "frequency", main = "Distribution of Phi 3")
+hist(phi4chain, breaks = 100, xlab = "Phi 4", ylab = "frequency", main = "Distribution of Phi 4")
+hist(sigmachain, breaks = 100, xlab = "Sigma", ylab = "frequency", main = "Distribution of Sigma")
