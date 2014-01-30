@@ -1,0 +1,102 @@
+#problem 1a
+##run PERT 
+theta = .01
+theta_diff = 1 - theta
+n = 1e5
+runs = 999
+step = .001
+#create vector to hold values
+vec = matrix(data = NA, nrow = n, ncol = runs)
+
+start = Sys.time()
+for (j in 1:runs){
+  
+  #loop through n times
+  for (k in 1:n){
+  x = rgamma(1,2,2)
+  y = rgamma(1,2,1)
+  z = rgamma(1,2,2/3)
+  E_L = max((theta*x + y), theta_diff*z)
+  vec[k,j] = E_L
+  }
+
+theta = theta + .001
+theta_diff = theta_diff - .001
+cat("Run Number|",j,"\n")
+
+}
+
+means = rep(NA, runs)
+for (w in 1:runs){
+  means[w] = mean(vec[,w])
+}
+Sys.time() - start
+
+plot(means, type = "l", main = "Expected Value of Finishing Time")
+min(means)
+which(means < 2.74)
+##min at run 583.  Theta = .584, 1-theta = .416
+## runs bottoms between 583 and 646 
+##[1] 583 592 595 627 646
+## all below 2.74
+
+#problem 1b
+#finite differences
+#Define a function to sample L given theta
+L = function(theta) max(theta * rgamma(1, shape = 2,rate = 2) + rgamma(1, shape = 2, rate = 1),
+                              (1 - theta) * rgamma(1, shape = 2, rate = 2/3))
+
+LN = function(theta,N) {
+  hold = rep(NA,N)
+  for(j in 1:N){
+    hold[j]<-L(theta)
+  }
+  return(mean(samp))
+}
+
+#Define a function to estimate gradient at a given point
+gradient = function(x,step,N) (LN(x+step,N) - LN(x,N))/step
+
+#Starting point
+xNaught = 0.1
+#Number of samples used to estimate E[L]
+n = 1e6
+#Size of steps (delta theta)
+dTheta = nSamp^(-0.25)
+
+#matrix to hold values used in iteration
+results = matrix(c(xNaught,LN(x0,n),gradient(x0,dTheta,n),NA),1,4)
+colnames(results) = c("XPoint", "YPoint", "Gradient", "Alpha")
+
+#Steepest descent
+k = 1
+eps = 1e-6
+
+repeat{
+  alpha = 0.1
+  xCurr = results[k,1]
+  yCurr = results[k,2]
+  gCurr = results[k,3]
+  repeat{
+    xNew = xCurr - alpha*gCurr
+    yNew = sampleLN(xNew,nSamp)
+    if(yNew < yCurr | alpha < eps){
+      results[k,4] = alpha
+      results = rbind(results,c(xNew,yNew,gradient(xNew,dTheta,nSamp),NA))
+      break
+    } 
+    alpha = alpha/2
+  } 
+  if(99999 < k | alpha < eps){break}
+  k = k + 1
+  
+  cat("Iteration Number: ", k, "\n")
+  cat("Current Y is: ", yNew, "\n")
+  cat("Current Alpha used: ", alpha, "\n")
+}
+
+##problem 2
+X = 6
+mat = matrix(rnorm(X*X), nrow = X, ncol = X)
+mat = mat+t(mat)
+mat
