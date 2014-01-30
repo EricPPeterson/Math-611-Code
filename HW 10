@@ -1,0 +1,111 @@
+##HW 10 Problem 2
+
+GDP_data <- read.table("C:/Users/eric/Desktop/GTown Stats/math 611/HW10/GDP_data.csv", header=T, quote="\"")
+GDP <- rep(NA, nrow(GDP_data2))
+
+GDP[1] <- 0
+sum.chain <- rep(0, length (GDP))
+qtr = gl(4,1,136)
+yr = as.numeric( gl(36,4,136) ) + 1950
+yrQ = cbind( yr, qtr, GDP)
+
+for (k in 2:nrow(GDP_data)){
+  GDP[k] <- 100 * (log(GDP_data[k, 1]) - log(GDP_data[(k-1), 1])) 
+}
+
+##plots for GDP, and growth rate
+plot(GDP_data[,1], type = "l", main = "Raw GDP", ylab = "Total GDP in Trillions")
+plot(GDP, type = "l", main = "GDP growth rate", ylab = "Growth rate Percentage")
+
+
+mat <- matrix(data = 0, nrow = length(GDP), ncol = length(GDP))
+old.chain <- matrix(data = 1, nrow = length(GDP))
+flips <- 1e6
+
+alpha <- c(-0.3577, 1.522)
+p <- 0.9049
+q <- 0.7550
+sigma <- 0.7690
+phi <- c( -0.213,  -0.247, -0.058, 0.014, 1)
+prob.chain <- rep(p, nrow(mat))
+accept <- 0
+reject <- 0
+
+for (k in 1:nrow(mat)){
+  if (k <= 5){mat[k, 1:5]  = phi
+  } else {
+  mat[k,(k-4):k] = phi
+  }
+}
+
+e <- function(m, s, x, rate, point){
+  Z <- rep(NA, 5) 
+  count <- rev(seq(from = (point - 4), to = point, by = 1))
+  for (j in 1:5){
+    Z[j] <- x[count[1], count[j]]*(m[count[j]] - rate[1] - (rate[2] * s[count[j]]))
+  }
+  e0 <- Z[1] - Z[2] - Z[3] - Z[4] - Z[5]
+  return(e0)
+}
+
+start <- Sys.time()
+
+for (num in 1:flips){
+  W <- sample((5:135), 1)
+  
+  new.state <- ifelse(old.chain[W] == 1, 0, 1)
+  new.chain <- old.chain 
+  new.chain[W,] <- new.state
+  
+  old.chain.prob <- c(prob.chain[W], prob.chain[W+1])
+  
+  ##check state|state-1 probabilities for hidden state
+  new.chain.prob <- rep(NA, 2)
+  if(new.chain[W] == new.chain[W-1]){
+    new.chain.prob[1] <- ifelse(new.chain[W] == 1, p, q)
+  }
+  if(new.chain[W] != new.chain[W-1]){
+    new.chain.prob[1] <- ifelse(new.chain[W] == 0, 1-p, 1-q)
+  }
+  if(new.chain[W+1] == new.chain[W]){
+    new.chain.prob[2] <- ifelse(new.chain[W+1] == 1, p, q)
+  }
+  if(new.chain[W+1] != new.chain[W]){
+    new.chain.prob[2] <- ifelse(new.chain[W] == 0, 1-q, 1-p)
+  }
+  
+  e.new <- e(GDP, new.chain, mat, alpha, W)
+  e.old <- e(GDP, old.chain, mat, alpha, W)
+  
+  like.new <- prod(new.chain.prob) * dnorm(e.new, mean = 0, sd = sigma)
+  like.old <- prod(old.chain.prob) * dnorm(e.old, mean = 0, sd = sigma)
+  
+  ##check proposal versus old distribution
+  U <- runif(1)
+  if(U < like.new/like.old){
+    old.chain <- new.chain
+    accept <- accept + 1
+  } else {
+    reject <- reject + 1
+  }
+  cat(num, "\n")
+  if(num > 50000){
+    sm.chain <- sum.chain
+    sum.chain <- ifelse(old.chain == 1, 0, 1) + sm.chain
+  }
+}
+Sys.time() - start
+
+sum.chain <- sum.chain/num
+accpt_pct <- accept/num
+yrQ <- cbind(yrQ, sum.chain)
+plot(y = sum.chain[5:136], x = yrQ[5:136,1], type = "l", main = "Time Percentage in Recession", ylab = "Percentage", xlab = "Year")
+which(sum.chain > .50)
+which(sum.chain > .50)
+
+##[1] 12 13 14 28 29 38 39 40
+## 1953 Q4
+## 1954 Q1, Q2
+## 1957 Q4
+## 1958 Q1
+##1960 Q2, Q3, Q4
