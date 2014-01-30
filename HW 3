@@ -1,0 +1,284 @@
+##HW #3
+
+##Problem 2
+#part a
+x0 = c(4,4)
+n = 1e5
+points = matrix(NA,nrow = n, ncol = 8)
+colnames(points) = c("x","y","fx_length", "px1","px2","Rosie Before", "Rosie After", "Alpha Used")
+alpha = 1
+
+
+Rosie = function(x1,x2){
+  100*(x2 - x1^2)^2 + (1-x1)^2
+}
+Rosie2 = Rosie(4,4)
+
+start = Sys.time()
+for (i in 1:n){
+  
+  ##find direction of greatest descent
+  Rosie1 = Rosie2
+  dx1 = 400*x0[1]^3 - 400*x0[1]*x0[2] + 2*x0[1] - 2
+  dx2 = 200*(x0[2]-x0[1]^2)
+  gX = c(dx1,dx2)
+  len = norm(as.matrix(gX), type = "F")
+  pX = -gX/len
+  
+  ## make new point to test
+  x0_1 = x0 + alpha*pX
+  Rosie2 = Rosie(x0_1[1],x0_1[2])
+  while (Rosie2 > Rosie1){
+    alpha = alpha/2;
+    x0_1 = x0 + alpha*pX;
+    Rosie2 = Rosie(x0_1[1], x0_1[2]);
+  }
+  x0 = x0_1
+  x0_1 = c(NA,NA)
+  points[i,] = cbind(x0[1], x0[2], len, pX[1], pX[2], Rosie1, Rosie2, alpha)
+  alpha = 1
+  if (len < 1e-8){stop("Algo Coverged.")}
+  flush.console()
+}
+points = na.omit(points)
+j = nrow(points)
+points[j,]
+Sys.time() - start
+
+plot(x = points[,1], y = points[,2], type = "l", main = "Steepest Descent Algo", ylab = "y-point", xlab = "x-point")
+
+#part b
+x = c(4,4)
+points2 = matrix(NA,nrow = 10, ncol = 2)
+colnames(points2) = c("x","y")
+
+for (j in 1:10){
+  H = matrix(NA, nrow = 2, ncol = 2)
+  dx1 = 400*(x[1]^3) - 400*x[1]*x[2] + 2*x[1] - 2
+  dx2 = 200*x[2]-200*(x[1]^2)
+  gradX = c(dx1,dx2)
+  H[1,1] = 1200 * x[1]^2 - 400*x[2] + 2
+  H[1,2] = -400 * x[1]
+  H[2,1] = -400 * x[1]
+  H[2,2] = 200
+  Hinv = ginv(H)
+  subt = Hinv %*% gradX
+  x_1 = x - subt
+  x = x_1
+  
+  points2[j,] = x
+}
+
+#Question 3
+#part a
+set.seed(1)
+X1 = rep(NA, 100)
+for (i in 1:100){
+  x = runif(1) 
+  if(x <= .70){X1[i] = rnorm(1,mean = 1, sd = 1)
+  } else {
+    X1[i] = rnorm(1, mean = 1.25, sd = (1.5)^.5)
+  }  
+}  
+plot(density(X1), main = "Density of Mixture 1")
+
+X2 = rep(NA, 100)
+for (j in 1:100){
+  x = runif(1) 
+  if(x <= .70){X2[j] = rnorm(1,mean = 1, sd = 1)
+  } else {
+    X2[j] = rnorm(1, mean = 3, sd = 1.5)
+  }  
+}  
+plot(density(X2), main = "Density of Mixture 2")
+
+X3 = rep(NA, 100)
+for (k in 1:100){
+  x = runif(1) 
+  if(x <= .70){X3[k] = rnorm(1,mean = 1, sd = 1)
+  } else {
+    X3[k] = rnorm(1, mean = 10, sd = 1.5)
+  }  
+}  
+plot(density(X3), main = "Density of Mixture 3")
+
+####################
+##as a loop only####
+####################
+
+sd1 = 1
+sd2 = (1.5)^.5
+prob1 = 0.70
+prob2 = 0.30
+runs = 100
+W = 100
+points = matrix(NA,nrow = W, ncol = 8)
+colnames(points) = c("x","y","fx_length", "px1","px2","Norm Before", "Norm After", "Alpha Used")
+alpha = 1
+
+##Mixture 1
+mu = c(0,0)
+x = X1
+
+##Mixture 2
+mu = c(0,0)
+x = X2
+
+##Mixture 3
+mu = c(0,0)
+sumX = sum(X3)
+
+norm1 = function(mu1,mu2){
+  for (i in 1:runs)
+   summed =  log(((prob1/(2*pi*sd1))*exp(-x[i] + mu[1]^2)/(2*sd1))) + (prob2/2*pi*sd2)*exp(-(x[i] - mu[2])^2/(2*sd2))
+  return(sum(summed))
+}
+
+normTwo = norm1(mu[1],mu[2])
+like1 = rep(NA, runs)
+like2 = rep(NA, runs)
+
+for (i in 1:W){
+  
+  ##find direction of greatest ascent
+  normOne = normTwo
+  for (k in 1:runs){
+    like1[k] = ((prob1/(2*pi*sd1)^.5)*exp((-x[k] + mu[1])^2)/(2*sd1^2)*((-x[k] + mu[1])/sd1^2)/(prob1/(2*pi*sd1^2)*exp(-x[k] + mu[1]/(2*sd1^2)) + prob2/(2*pi*sd2^2)*exp(-x[k] + mu[2]/(2*sd2^2)))) 
+    like2[k] = ((prob2/(2*pi*sd2)^.5)*exp((-x[k] + mu[2])^2)/(2*sd2^2)*((-x[k] + mu[2])/sd2^2)/(prob1/(2*pi*sd1^2)*exp(-x[k] + mu[1]/(2*sd1^2)) + prob2/(2*pi*sd2^2)*exp(-x[k] + mu[2]/(2*sd2^2)))) 
+    }
+  
+  gX = c(sum(like1),sum(like2))
+  len = norm(as.matrix(gX), type = "F")
+  pX = gX/len
+  
+  ## make new point to test
+  mu_1 = mu + alpha*pX
+  normTwo = norm1(mu_1[1], mu_1[2])
+  while (normTwo < normOne){
+    alpha = alpha/2;
+    mu_1 = mu + alpha*pX;
+    normTwo = norm1(mu[1], mu[2]);
+  }
+  
+  mu = mu_1;
+  mu_1 = c(NA,NA);
+  points[i,] = cbind(mu[1], mu[2], len, pX[1], pX[2], normOne, normTwo, alpha);
+  alpha = 1;
+  if (len < 1){stop("Algo Coverged.")};
+  flush.console();
+}
+
+points = na.omit(points)
+j = nrow(points)
+cat(points[j,])
+Sys.time() - start
+
+
+#part b
+x = c(4,4)
+points2 = matrix(NA,nrow = 10, ncol = 2)
+colnames(points2) = c("x","y")
+
+for (j in 1:10){
+  H = matrix(NA, nrow = 2, ncol = 2)
+  dx1 = (1/(2*sd1^2)) * (2*prob1*(sumX-runs*mu[1]))
+  dx2 = (1/(2*sd1^2)) * (2*prob2*(sumX-runs*mu[2]))
+  gradX = c(dx1,dx2)
+  H[1,1] = 
+  H[1,2] = 0
+  H[2,1] = 0
+  H[2,2] = 
+  Hinv = ginv(H)
+  subt = Hinv %*% gradX
+  x_1 = x - subt
+  x = x_1
+  
+  points2[j,] = x
+}
+
+##problem 4
+#part b
+##generate value t with probability P(T[i] - T[i-1] = t|X(T[i-1]) = j)
+## set probability @ random unif variable
+z = runif(1)
+n = 1e8
+
+start = Sys.time()
+jump = function(x){
+bars = rgeom(n,z)
+return(bars)
+}
+jump(z)
+Sys.time() - start
+
+plotBars = table(collect)
+barplot(plotBars, main = "Geometric Distribution Plot", ylab = "Total Count", xlab = "Possible Outcomes")
+
+
+#part d
+n = 1e9
+mat = matrix(data = c(0.9997,0.0001,0.0002,0.0003,0.9992,0.0005,0.0001,0.0004,0.9995), nrow = 3, ncol = 3)
+
+start = Sys.time()
+jump = function(x){
+  bars = rgeom(n,z)
+  return(bars)
+}
+jump(z)
+Sys.time() - start
+
+
+
+
+
+
+
+
+
+
+
+
+##########
+##as func#
+##########
+
+findMLE = function(mu0, p1, p2, sumX1, N, n, stdev1, stdev2, a){
+  
+  for (i in 1:n){
+    
+    ##find direction of greatest ascent
+    normOne = normTwo
+    dx1 = for (j in 1:runs){
+      
+    }
+    
+    dx2 = for (k in 1:runs){
+      
+    }
+    gX = c(dx1,dx2)
+    len = norm(as.matrix(gX), type = "F")
+    pX = gX/len
+    
+    ## make new point to test
+    mu0_1 = mu0 + alpha*pX
+    normTwo = norm1(mu0_1[1], mu0_1[2])
+    while (normTwo < normOne){
+      alpha = alpha/2;
+      mu0_1 = mu0 + alpha*pX;
+      normTwo = norm1(mu0[1], mu0[2]);
+    }
+    mu0 = mu0_1
+    mu0_1 = c(NA,NA)
+    points[i,] = cbind(mu0[1], mu0[2], len, pX[1], pX[2], normOne, normTwo, alpha)
+    alpha = 1
+    if (len < 1){stop("Algo Coverged.")}
+    cat(i)
+    flush.console()
+  }
+  points = na.omit(points)
+  j = nrow(points)
+  cat(points[j,])
+  Sys.time() - start
+}
+
+findMLE(mu, prob1, prob2, sumX, W, runs, sd1, sd2, alpha)
