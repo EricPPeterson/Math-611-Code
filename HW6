@@ -1,0 +1,409 @@
+##HW 6
+#Problem 3
+#total runs 
+set.seed(100)
+n <- 1000
+X <- rep(NA, n)
+p1 <- 0.70
+p2 <- 0.30
+sig1 <- 1
+sig2 <- sqrt(1.5)
+mean1 <- 1
+mean2 <- 6
+
+for (i in 1:n){
+  x <- runif(1) 
+  if(x <= p1){X[i] = rnorm(1, mean = mean1, sd = sig1)
+  } else {
+    X[i] = rnorm(1, mean = mean2, sd = sig2)
+  }  
+}
+
+#loop
+#set initial values
+mean1 <- 0
+mean2 <- 0
+
+mysum <- function(x) {
+  sum(x[is.finite(x)])
+}
+
+k<-2
+
+loglik <- rep(NA, 1000)
+loglik[1] <- 0
+loglik[2] <- mysum(p1 * (log(p1) + log(dnorm(X, mean = mean1, sd = sig1)))) + mysum(p2 * (log(p2) + log(dnorm(X, mean  = mean2, sd = sig2))))
+points <- c()
+
+while(abs(loglik[k]-loglik[k-1]) >= 1e-6) {
+  # E step
+  tau1 <- p1 * dnorm(X, mean = mean1, sd = sig1) / (p1 * dnorm(X, mean = mean1, sd = sig1) + p2 * dnorm(X, mean = mean2, sd = sig2))
+  tau2 <- p2 * dnorm(X, mean = mean2, sd = sig2) / (p1 * dnorm(X, mean = mean1, sd = sig1) + p2 * dnorm(X, mean = mean2, sd = sig2))
+
+  # M step
+  mean1<-mysum(tau1 * X) / mysum(tau1)
+  mean2<-mysum(tau2 * X) / mysum(tau2)
+  
+  llike <- rep(NA, n)
+  for (w in 1:n){
+    llike[w] <- tau1[w] * (log(p1) + dnorm(X[i], mean = mean1, sd = sig1, log = TRUE)) + 
+    tau2[w] * (log(p2) + dnorm(X[i], mean = mean2, sd = sig2, log = TRUE))
+  }
+  loglik[k+1] <- sum(llike)
+  k<-k+1
+  cat("Iteration:", k-2, "\n")
+  cat("Log Likelihood:", loglik[k],"\n")
+  cat("Mean 1:", mean1, "\n")
+  cat("Mean 2:", mean2, "\n")
+  points <- rbind(points, c(mean1,mean2,loglik[k], k-2))
+}
+colnames(points) <- c("Mean 1", "Mean2", "Log Likelihood", "Iteration")
+
+##part c
+xpt <- c(4,4)
+
+#banana function
+fn <- function(x, y){
+  (1 - x)^2 + 100 * (y - x^2)^2
+}
+
+#take derivatives
+gradX <- function(x,y) {c(-2 + 2*x - 400*x*y + 400* x^3, 200 * y - 200 * x^2)} 
+
+Hess <- function(x,y) {matrix(nrow = 2, ncol = 2, data = c(2 - 400 * y + 1200*x^2, 
+                                            -400 * x, -400 * x, 200))}
+
+modNewton <- function(x, y, f, grad, H){
+  points <- c()
+  eps <- 1e-6
+  repeat {
+  g <- grad(x, y)
+  H1 <- H(x, y)
+  Hinv <- ginv(H1)
+  subt <- Hinv %*% g
+  Xnew <- x - subt[1]
+  Ynew <- y - subt[2]
+  cat ("New Points", "\n")
+  cat (Xnew, Ynew, "\n")
+  if (abs(Xnew - x) < eps & abs(Ynew - y < eps)) {break}
+  x <- Xnew
+  y <- Ynew
+  points <- rbind(points, x, y)
+  }
+  colnames(points) <- c("Points")
+  return(points)
+}
+
+modNewton(xpt[1], xpt[2], fn, gradX, Hess)
+
+
+##part iii
+##HW 6
+#Problem 3
+
+set.seed(100)
+n <- 1000
+X <- rep(NA, n)
+
+for (i in 1:n){
+  x <- runif(1) 
+  if(x <= .70){X[i] = rnorm(1, mean = 1, sd = sqrt(1))
+  } else {
+    X[i] = rnorm(1, mean = 6, sd = sqrt(1.5))
+  }  
+}  
+
+sd1 <- 1
+sd2 <- 1.5
+prob1 <- 0.70
+prob2 <- 0.30
+prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+two_sd1 <- 2*1
+two_sd2 <- 2*1.5
+Xi <- (X - mu1) / sd1
+Xi2 <- (X - mu2) / sd2
+Xisq <- -(((X - mu1)^2) / two_sd1)
+Xi2sq <- -(((X - mu2)^2) / two_sd2)
+mean <- c(0,0)
+
+#Function to generate f
+fx<-function(mu = c(0,0)){
+  log(prob1*(1/sqrt(2*pi))*exp(-(X-mu[1])^2/2)+prob2*(1/sqrt(3*pi))*exp(-(X-mu[2])^2/3))
+}
+
+f2 <- sum(fx(mean))
+
+
+#take derivatives
+gradX <- function(mu1,mu2) { like1 <- rep(NA, n)
+                         like2 <- rep(NA, n)
+                         
+                            for (j in 1:n){
+                              Xisq <- -(((X[j] - mu1)^2)/two_sd1)
+                              Xi2sq <- -(((X[j] - mu2)^2)/two_sd2)
+                              Xi <- (X[j] - mu1)/sd1
+                              like1[j] <-  (prob1pi_two_sd1*exp(Xisq) * Xi) / (prob1pi_two_sd1*exp(Xisq) + prob2pi_two_sd2*exp(Xi2sq))  
+                              
+                              Xisq <- -(((X[j] - mu1)^2)/two_sd1)
+                              Xi2sq <- -(((X[j] - mu2)^2)/two_sd2)
+                              Xi2 <- (X[j] - mu2)/sd2
+                              like2[j] <- (prob1pi_two_sd1*exp(Xi2sq) * Xi2) / (prob1pi_two_sd1*exp(Xisq) + prob2pi_two_sd2*exp(Xi2sq))
+                            }
+                        gradMat <- matrix(data = c(sum(like1), sum(like2)), nrow = 2, ncol = 1)
+                        return(gradMat)
+                      } 
+
+dmu1sq <- function(mu1, mu2){    
+  sd1 <- 1
+  sd2 <- 1.5
+  prob1 <- 0.70
+  prob2 <- 0.30
+  prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+  prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+  two_sd1 <- 2*1
+  two_sd2 <- 2*1.5
+  Xi <- (X - mu1) / sd1
+  Xi2 <- (X - mu2) / sd2
+  Xisq <- -(((X - mu1)^2) / two_sd1)
+  Xi2sq <- -(((X - mu2)^2) / two_sd2)
+  num <- sum(((prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)) * ((X - mu1)^2 - 1)) * 
+                    (prob1pi_two_sd1 * exp(Xisq) - (prob1pi_two_sd1 * exp(Xisq))^2 * (X - mu1)^2) / 
+                       (prob1pi_two_sd1 * exp(Xisq) + prob2pi_two_sd2 * exp(Xi2sq))^2)               
+  return(num)
+} 
+
+dmu2sq <- function(mu1, mu2){
+  sd1 <- 1
+  sd2 <- 1.5
+  prob1 <- 0.70
+  prob2 <- 0.30
+  prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+  prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+  two_sd1 <- 2*1
+  two_sd2 <- 2*1.5
+  Xi <- (X - mu1) / sd1
+  Xi2 <- (X - mu2) / sd2
+  Xisq <- -(((X - mu1)^2) / two_sd1)
+  Xi2sq <- -(((X - mu2)^2) / two_sd2)
+  
+  num2 <- sum(((prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)) * (4/9* (X - mu2)^2 - 1)) * 
+               (prob2pi_two_sd2 * exp(Xi2sq) - ((4/9)* prob2pi_two_sd2 * exp(Xi2sq))^2 * (X - mu2)^2) / 
+               (prob1pi_two_sd1 * exp(Xisq) + prob2pi_two_sd2 * exp(Xi2sq))^2)               
+  return(num2)
+} 
+
+
+dmu12 <- function(mu1, mu2){
+  
+  sd1 <- 1
+  sd2 <- 1.5
+  prob1 <- 0.70
+  prob2 <- 0.30
+  prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+  prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+  two_sd1 <- 2*1
+  two_sd2 <- 2*1.5
+  Xi <- (X - mu1) / sd1
+  Xi2 <- (X - mu2) / sd2
+  Xisq <- -(((X - mu1)^2) / two_sd1)
+  Xi2sq <- -(((X - mu2)^2) / two_sd2)
+  
+  num3 <- sum(-(2/3) * (prob1pi_two_sd1 * exp(Xi2sq) * prob2pi_two_sd2 * exp(Xi2sq) * (X - mu1) * (X - mu2)/
+                (prob1pi_two_sd1 * exp(Xisq) + prob2pi_two_sd2 * exp(Xi2sq))))             
+  
+  return(num3)
+}
+
+Hessian <- function(X, Y, Z, mu1, mu2){matrix(nrow = 2, ncol = 2, data = c(X(mu1, mu2), Y(mu1, mu2), Y(mu1, mu2), Z(mu1,mu2)))}
+
+modNewton <- function(mu = c(0,0), grad, H){
+  points <- c()
+  eps <- 1e-6
+  a <- 1
+  
+  repeat {
+    f <- f2
+    g <- as.numeric(grad(mu[1],mu[2]))
+    Hinv <- ginv(H(dmu1sq, dmu12, dmu2sq, mu[1], mu[2]))
+    subt <- Hinv %*% g
+    
+    #Norm of Hinv_grad
+    Norm_Hinv_grad <-  norm(as.matrix(subt),type = "F")
+    #calculate direction
+    pu <- subt/Norm_Hinv_grad
+    muNew <- mu + a * pu
+    f2 <- sum(fx(muNew))
+    
+    while(f2 <= f & a > eps){
+    a <- a/2
+    muNew <- mu + a * pu
+    f2 <- sum(fx(muNew))
+    }
+    
+    cat (f2, "\n")
+    cat (f, "\n")
+    cat ("New Points", "\n")
+    cat (muNew, "\n")
+    mu <- muNew
+    points <- cbind(points, mu)
+    if(f2 - f < eps){break}
+  }
+  return(points)
+}
+
+modNewton(mu = c(0,0), gradX, Hessian)
+
+#problem 3
+
+dat <- matrix(nrow = 2, ncol = 17, data = NA)
+for (i in 1:17){
+    dat[1,i] = i - 1
+}
+
+dat[2,1] = 379
+dat[2,2] = 299
+dat[2,3] = 222
+dat[2,4] = 145
+dat[2,5] = 109
+dat[2,6] = 95
+dat[2,7] = 73
+dat[2,8] = 59
+dat[2,9] = 45
+dat[2,10] = 30
+dat[2,11] = 24
+dat[2,12] = 12
+dat[2,13] = 4
+dat[2,14] = 2
+dat[2,15] = 0
+dat[2,16] = 1
+dat[2,17] = 1
+
+
+
+#problem 4
+#part a
+n <- 1e6
+runs <- 1000
+collect_means <- matrix(data = NA, ncol = 1, nrow = runs)
+colnames(collect_means) <- c("Overall Means")
+Sums <- matrix(data = 0, ncol = 1, nrow = n)
+colnames(Sums) <- c("Overall Mean")
+
+
+#for (q in 1:runs){
+  mat <- matrix(data = 0, nrow = 100, ncol = 100)
+  
+  for (z in 1:n){
+  
+  i <- sample(1:100, 1)
+  j <- sample(1:100, 1)
+  
+    if (mat[i,j] == 1){ mat[i,j] = 0 }   
+  
+    if (mat[i,j] == 0){
+    
+      if (i != 1 & j!= 1 & i != 100 & j != 100){
+        if (mat[i + 1,j] != 0 | mat[i - 1, j] != 0 | mat[i, j + 1] != 0 | mat[i, j - 1]){
+          mat[i,j] = 0} else {
+            mat[i,j] = 1
+          }
+      }
+  
+      if (i == 1 & j == 1){
+        if(mat[i + 1, j] != 0 | mat[i, j + 1] != 0){
+          mat[i,j] == 0} else {
+            mat[i,j] = 1
+          }
+      }
+  
+      if (i == 1 & j == 100){
+        if(mat[i + 1, j] != 0 | mat[i + 1, j - 1] != 0){
+          mat[i,j] == 0} else {
+            mat[i,j] = 1
+        }
+      }
+  
+      if (i == 100 & j == 1){
+        if(mat[i - 1, j] != 0 | mat[i, j + 1] != 0){
+          mat[i,j] = 0} else { 
+          mat[i,j] = 1
+        }
+      }
+  
+      if (i == 100 & j == 100){
+        if(mat[i - 1, j] != 0 | mat[i, j - 1] != 0){
+          mat[i,j] = 0} else { 
+            mat[i,j] =1
+        }
+      }
+  
+      if (i == 1 & j != 1 & j != 100){
+        if(mat[i, j - 1] != 0 | mat[i, j + 1] != 0){
+          mat[i,j] = 0} else { 
+            mat[i,j] = 1
+        }
+      }
+    
+      if (i == 100 & j != 1 & j != 100){
+        if(mat[i, j - 1] != 0 | mat[i, j + 1] != 0){
+          mat[i,j] = 0} else { 
+            mat[i,j] = 1
+        }
+      }
+  
+      if (j == 1 & i != 1 & i != 100){
+        if(mat[i - 1, j] != 0 | mat[i + 1, j] != 0){
+          mat[i,j] = 0} else { 
+            mat[i,j] = 1
+        }
+      }    
+    
+      if (j == 100 & i != 1 & i != 100){
+        if(mat[i - 1, j] != 0 | mat[i + 1, j] != 0){
+          mat[i,j] = 0} else { 
+            mat[i,j] = 1
+        }
+      }
+     Sums[z,1] <- sum(mat)
+     }
+  }
+ ## collect_means[q,1] <- Sums[z,1]/(100^2) 
+  ##cat(q, "\n")
+##}
+  
+
+
+histodata <- read.csv("C:/Users/eric/Desktop/GTown Stats/math 611/HW6/histodata.csv")
+hist(histodata[,2], breaks = 50, main = "Histogram of Means", xlab = "Means", ylab = "Frequency")
+range(histodata[,2])
+mean(histodata[,2])
+##range(histodata[,2])
+##0.3575 0.3724
+##mean(histodata[,2])
+##0.3660203
+##pvalue
+test_stat <- 0.40
+mean(test_stat > histodata[,2])
+#[1] 1
+
+
+sd(PlotPlot)
+##sd 0.01864458
+
+
+##mean and sd
+pctOnes <- Sums/10000
+mean(pctOnes)
+##[1] 0.3613793
+##[1] 0.3633801
+sd(pctOnes)
+##[1] 0.01831638
+##[1] 0.01840436
+
+##pvalue
+pnorm(0.40, mean = mean(pctOnes), sd = sd(pctOnes))
+##[1] 0.9820967
+##[1] 0.9766901
+plot(density(pctOnes), xlim = c(0.34, 0.375), main = "Density Plot for Hard Core Model")
+image(mat * 128, main = "Final State Proposal")
