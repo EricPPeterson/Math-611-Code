@@ -1,0 +1,281 @@
+##Final Exam
+##Problem 1
+##part c
+
+set.seed(1)
+T <- 20
+trade.days <- 252
+runs <- 1e6
+imp.vol <- .20 * sqrt(1/trade.days)
+mu <- -(imp.vol^2)/2
+
+B <- rnorm(n = runs, mean = 0, sd = sqrt(T))
+Euro <- matrix(data = NA, nrow = runs, ncol = 1)
+colnames(Euro) <- ("Price")
+
+for(j in 1:runs){
+  Euro[j] <- exp(mu*T + imp.vol * B[j])
+  cat(j, "\n")
+}
+
+put.92 <- sum(abs(subset(Euro, Euro[,1] < .92) - .92))/runs
+put.87 <- sum(abs(subset(Euro, Euro[,1] < .87) - .87))/runs
+call.103 <- sum(abs(subset(Euro, Euro[,1] > 1.03) - 1.03))/runs
+call.113 <- sum(abs(subset(Euro, Euro[,1] > 1.13) - 1.13))/runs
+
+cat(put.92, "s0")
+cat(put.87, "s0")
+cat(call.103, "s0")
+cat(call.113, "s0")
+
+premium <- put.92 + call.103 - put.87 - call.113
+premium
+mean(Euro)
+
+
+##part d
+hist(Euro, breaks = 100, main = "Histogram of Random Walk", xlab = "distance from s0")
+sort.Euro <- sort(Euro)
+
+lower.strike = sort.Euro[10000]
+upper.strike = sort.Euro[990000]
+
+strikes <- c(lower.strike, upper.strike)
+strikes
+
+## price calls/puts in area of breakeven
+b.s <- 20
+puts <- rep(NA, b.s)
+calls <- rep(NA, b.s)
+putstrike <- c()
+callstrike <- c()
+
+for(i in 1:b.s){
+  X <- (93-i)/100
+  puts[i] <- sum(abs(subset(Euro, Euro[,1] < X) - X))/runs
+  putstrike <- c(putstrike,X)
+}
+
+for(j in 1:b.s){
+  X <- (j + 102)/100
+  calls[j] <- sum(abs(subset(Euro, Euro[,1] > X) - X))/runs
+  callstrike <- c(callstrike,X)
+}
+
+prices <- cbind(callstrike, calls, putstrike,puts)
+colnames(prices) <- c("Call Strike", "Calls", "Put Strike", "Puts")
+
+##problem 2
+#part a
+##download data
+require(ergm)
+require(Matrix)
+require(MASS)
+
+sampsonsMonks <- read.csv("C:/Users/eric/Desktop/GTown Stats/math 611/Final/sampsonsMonks.csv")
+M = as.matrix(sampsonsMonks[,-1])
+m = M
+
+##create all possible combinations of monks
+ij <- t(combn(dim(M)[1], 2))
+ji <- t(rbind(ij[,2], ij[,1]))
+
+##g.1 and dg.1
+g.1 <- sum(M)
+dg.1 <- rep(1, length(M[ij]))
+
+##g.2 and dg.2
+g.2 <- sum(M[ij] * M[ji])
+dg.2 <- M[ji]
+
+##g.3 and dg.3
+Yik.Ykj = M%*%M - Diagonal(18, diag(M%*% M))
+g.3 <- sum(M * Yik.Ykj)
+
+dg.3 <- function(Y,i,j){
+  total = 0
+  for(k in setdiff(1:nrow(Y),c(i,j))){
+    total = total + Y[i,k]*Y[k,j] + Y[i,k]*M[j,k] + Y[k,i]*Y[k,j]
+  }
+  return(total)
+}
+
+triad <- c()
+for (w in 1:nrow(ij)){
+  triad <- c(triad,dg.3(M,ij[w,1],ij[w,2]))
+}
+
+
+
+##create vectors for likelihood
+g.y <- c(g.1, g.2, g.3)
+d.gy <- cbind(dg.1, dg.2, triad)
+R <- M[ij]
+
+negLik <- function(theta){
+  
+  P <- function(i) { 
+    Pij <- 1/(1 + exp(-t(theta) %*% (d.gy[i,])));
+       -log(Pij * R[i] + (1 - Pij) * (1 - R[i]))
+    }
+  
+  n = length(R)
+  out <- sum(sapply(1:n,P))
+  return(out)
+}
+
+Theta <- c(-1,1,0)
+maxMLE <- nlm(negLik, p = Theta)
+
+
+#part c - Bayesian Methods
+##download data
+require(ergm)
+require(Matrix)
+require(MASS)
+require(boot)
+
+sampsonsMonks <- read.csv("C:/Users/eric/Desktop/GTown Stats/math 611/Final/sampsonsMonks.csv")
+Y = as.matrix(sampsonsMonks[,-1])
+
+##initialize trials and parameters
+runs <- 1e6
+theta <- matrix(data = NA, nrow = runs, ncol = 3)
+theta[1,] <- c(-2.1346, 2.4224, -0.0002616)
+sig <- c(0.2502, 0.2940, 0.1335)
+accept <- 0
+
+##create all possible combinations of monks
+ij <- combn(18,2)
+ji <- t(rbind(ij[,2], ij[,1]))
+
+## g.1, g.2, g.3
+g.1 <- function(m){ sum(m) }
+g.2 <- function(m){ sum(m[ij] * m[ji]) }
+g.3 <- function(m){ 
+  M = m %*% m - Diagonal(18, diag(m %*% m))
+  out <- sum(m * M) 
+  return(out)
+  }
+
+##function to flip node
+flip <- function(n){
+  ##set pt as a diagonal
+  swap <- c(1,1)
+  
+  ##flip point
+  ##make sure flip pt isn't a diagonal point
+  while(swap[1] == swap[2]){
+  swap <- sample(x = 1:n, size = 2, replace = F)
+  swap.pt <- ifelse(Y[swap[1],swap[2]] == 1, 0, 1)
+  }
+  out <- c(swap, swap.pt)
+  return(out)
+  }
+
+## make uniform variables
+U <- runif(runs)
+U.2 <- runif(runs)
+
+##MH Bayesian Algo
+th <- theta[1,]
+
+for (j in 2:runs){
+  
+  ##duplicate M matrix for changing edge
+  Y.prime <- Y
+  
+  ## proposal theta
+  ## use Unif distribution to create new auxiliary theta vector 
+  p <- rnorm(n = 3, mean = 0, sd = 0.001)
+  th.p <- th + p 
+  
+  ##flip an edge
+  swap.pt <- flip(18)
+  
+  ##create new auxiliary proposal Matrix M'
+  Y.prime[swap.pt[1],swap.pt[2]] <- swap.pt[3]
+  
+  ##g.1, g.2, g.3, g.1', g.2', g.3'
+  
+  g.prime <- c(g.1(Y.prime),g.2(Y.prime), g.3(Y.prime))
+  g <- c(g.1(Y), g.2(Y), g.3(Y))  
+  
+  ##MH accept/reject
+  e.prime <- exp(-th.p %*% g.prime) / exp(-th %*% g)
+  
+  if(U[j] < min(1, e.prime)){
+    
+    ##create the p(theta) for both old and proposal
+    p.th <- prod(pnorm(th, mean = th, sd = sig))
+    p.th.prime <- prod(pnorm(th.p, mean = th , sd = sig))
+    
+    ##create ratio from author's paper to cancel out k(theta)
+    a <- (p.th.prime * exp(-th.p %*% g) * exp(-th %*% g.prime))/(p.th * exp(-th %*% g) * exp(-th.p %*% g.prime)) 
+    if (is.nan(a) == T) {a = 0}
+
+    ## second MH ratio
+    
+    if(U.2[j] < min(1,a)){
+      theta[j,] <- th.p
+      th <- th.p
+      accept <- accept + 1
+    }
+    
+  } else {
+    theta[j,] <- th
+    
+  }  
+ cat(j, "\n")   
+}
+
+##graphs, etc.
+acc.rate <- accept/runs
+##aR
+##[1] 0.071
+
+theta.na <- na.omit(theta)
+colnames(theta.na) <- c("theta.1", "theta.2", "theta.3")
+hist(theta.na[,1], breaks = 200, main = "Theta 1 Histogram", xlab = expression(theta), ylab = "Frequency")
+hist(theta.na[,2], breaks = 200, main = "Theta 2 Histogram", xlab = expression(theta), ylab = "Frequency")
+hist(theta.na[,3], breaks = 200, main = "Theta 3 Histogram", xlab = expression(theta), ylab = "Frequency")
+mean(theta.na[,1])
+mean(theta.na[,2])
+mean(theta.na[,3])
+
+##part d
+##bootstrap the statistic
+n = 1e5
+boot.1 <- rep(NA, n)
+for (i in 1:n){
+  boot <- sample(theta.na[,1], size = length(theta[,1]), replace = T)
+  boot.1[i] <- mean(boot)
+  cat(i, "\n")
+}
+
+hist(boot.1, breaks = 100, main = "Histogram of Boot of Theta 1", xlab = expression(theta))
+
+n = 1e5
+boot.2 <- rep(NA, n)
+for (i in 1:n){
+  boot <- sample(theta.na[,2], size = length(theta[,2]), replace = T)
+  boot.2[i] <- mean(boot)
+  cat(i, "\n")
+}
+
+hist(boot.2, breaks = 100, main = "Histogram of Boot of Theta 2", xlab = expression(theta))
+
+
+n = 1e5
+boot.3 <- rep(NA, n)
+for (i in 1:n){
+  boot <- sample(theta.na[,3], size = length(theta[,3]), replace = T)
+  boot.3[i] <- mean(boot)
+  cat(i, "\n")
+}
+
+hist(boot.3, breaks = 100, main = "Histogram of Boot of Theta 3", xlab = expression(theta))
+
+quantile(boot.1, probs = c(0.025, 0.975))
+quantile(boot.2, probs = c(0.025, 0.975))
+quantile(boot.3, probs = c(0.025, 0.975))
