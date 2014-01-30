@@ -1,0 +1,240 @@
+##Homework 12
+##Question 1
+##part a
+ 
+##part i
+set.seed(1)
+n <- c(20, 50, 100)
+ 
+X <- lapply(n, rnorm)
+ 
+##part ii
+mn <- sapply(X, mean)
+ 
+#part ii A
+stdev <- sapply(X, sd)
+ 
+e <- c()
+for (j in 1:3){
+  e <- cbind(e, qt(0.975, df = n[j] - 1) * stdev[1]/sqrt(n[j]))
+}
+ 
+ciA <- c()
+for(j in 1:3){
+  ciA <- rbind(ciA, c(mn[j] - e[j], mn[j] + e[j]))
+}
+ 
+colnames(ciA) <- c("0.025", "0.975")
+rownames(ciA) <- c("Sample Size 20", "Sample Size 50", "Sample Size 100")
+ciA
+ 
+#part ii B
+ 
+ciB <- c()
+for (j in 1:3){
+  ciB <- rbind(ciB, c(mn[j] - 1.96 * stdev[j]/sqrt(n[j]), mn[j] + 1.96 * stdev[j]/sqrt(n[j])))
+}
+ 
+colnames(ciB) <- c("0.025", "0.975")
+rownames(ciB) <- c("Sample Size 20", "Sample Size 50", "Sample Size 100")
+ciB
+ 
+##part ii C
+runs <- 1e5
+meanboot <- matrix(data = NA, ncol = 3, nrow = runs)
+ 
+for (i in 1:runs){
+ 
+  boot1 <- sample(X[1], n[1],  replace = T)
+  meanboot[i,1] <- mean(boot1)  
+  boot2 <- sample(X[2], n[2],  replace = T)
+  meanboot[i,2] <- mean(boot2)  
+  boot3 <- sample(X[3], n[3],  replace = T)
+  meanboot[i,3] <- mean(boot3)  
+  
+  cat(i, "\n")
+}
+ 
+sortboot1 <- sort(meanboot[,1])
+ciBoot1 <- c(mean(meanboot[,1]) - sortboot1[97500], mean(meanboot[,1]) - sortboot1[2500])
+hist(meanboot[,1], breaks = 100, main = "Histogram of Bootstrap of sample = 20")
+ 
+sortboot2 <- sort(meanboot[,2])
+ciBoot2 <- c(mean(meanboot[,2]) - sortboot2[97500], mean(meanboot[,2]) - sortboot2[2500])
+hist(meanboot[,2], breaks = 100, main = "Histogram of Bootstrap of sample = 50")
+ 
+sortboot3 <- sort(meanboot[,3])
+ciBoot3 <- c(mean(meanboot[,3]) - sortboot3[97500], mean(meanboot[,3]) - sortboot3[2500])
+hist(meanboot[,3], breaks = 100, main = "Histogram of Bootstrap of sample = 100")
+ 
+ciC <- rbind(ciBoot1, ciBoot2, ciBoot3)
+colnames(ciC) <- c("0.025", "0.975")
+rownames(ciC) <- c("Sample 20", "Sample 50", "Sample 100")
+ 
+##part D
+t1 <- sqrt(n[1]) * (X1 - mean(X1)) / sd1
+t2 <- sqrt(n[2]) * (X2 - mean(X2)) / sd2
+t3 <- sqrt(n[3]) * (X3 - mean(X3)) / sd3
+ 
+run <- 1e5
+meanboott1 <- rep(NA, run)
+meanboott2 <- rep(NA, run)
+meanboott3 <- rep(NA, run)
+ 
+for (i in 1:run){
+  
+  boott1 <- sample(t1, 20,  replace = TRUE)
+  meanboott1[i] <- mean(boott1)  
+  boott2 <- sample(t1, 20,  replace = TRUE)
+  meanboott2[i] <- mean(boott2)  
+  boott3 <- sample(t1, 20,  replace = TRUE)
+  meanboott3[i] <- mean(boott3)  
+  
+  cat(i, "\n")
+}
+ 
+sort1 <- sort(meanboott1)
+sort2 <- sort(meanboott2)
+sort3 <- sort(meanboott3)
+ 
+one <- c(sort1[2500], sort2[97500])
+two <- c(sort2[2500], sort2[97500])
+three <- c(sort3[2500], sort3[97500])
+ 
+ciTstat <- rbind(one, two, three)
+colnames(ciTstat) <- c("0.025", "0.975")
+rownames(ciTstat) <- c("Sample 20", "Sample 50", "Sample 100")
+ 
+lower <- c()
+upper <- c()
+for (j in 1:3){
+  lower <- rbind(lower, mn[j] - stdev[j] * ciTstat[j,2]/sqrt(n[j]))
+  upper <- rbind(upper, mn[j] - stdev[j] * ciTstat[j,1]/sqrt(n[j]))  
+}
+ 
+ciD <- cbind(lower, upper)
+colnames(ciD) <- c("0.025", "0.975")
+rownames(ciD) <- c("Sample 20", "Sample 50", "Sample 100")
+ 
+##part D
+ciA; ciB; ciC; ciD
+ 
+ 
+ 
+##problem 2
+##part a
+set.seed(100)
+Election <- read.delim("C:/Users/eric/Desktop/GTown Stats/math 611/HW12/2012_Election_Polling_Data.csv")
+params <- c(-0.1, 0.1)
+vec <- c(-1,-1, 0, -1)
+mat <- cbind(c(1,-1,0,0), c(0,0,1,-1))
+ 
+Y <- function(muSig) {
+  ActObama <- .514
+  Yi <- rep(NA, nrow(Election))
+  
+  for (j in 1:nrow(Election)){
+    sig <- sqrt(ActObama * (1 - ActObama)/Election[j,2])
+    Yi[j] <- rnorm(n = 1, mean = ActObama, sd = sig) + rnorm(n = 1, mean = muSig[1], sd = muSig[2])
+  }
+  sumYi <- -sum(log(Yi))
+  return(sumYi)
+}
+ 
+maxMLE <- constrOptim(f = Y, theta = params, ui = mat, ci = vec, grad = NULL)
+maxMLE
+ 
+##part b
+run <- 1000
+MLEs <- matrix(data = NA, ncol = 2, nrow = run)
+param <- c(0,0.1)
+vec <- c(-.5, -.5, 0, -1)
+mat <- cbind(c(1,-1,0,0), c(0,0,1,-1))
+ 
+Y2 <- function(muSig) {
+  ActObama <- .514
+  Yi <- rep(NA, nrow(newElection))
+  
+  for (j in 1:nrow(newElection)){
+    sig <- sqrt(ActObama * (1 - ActObama)/newElection[j,2])
+    Yi[j] <- rnorm(n = 1, mean = ActObama, sd = sig) + rnorm(n = 1, mean = muSig[1], sd = muSig[2])
+  }
+  sumYi <- -sum(log(Yi))
+  return(sumYi)
+}
+ 
+ 
+ 
+for (j in 1:run){
+  X <- sample(x = 1:nrow(Election), size = nrow(Election), replace = TRUE)
+  newElection <- data.frame(Election[X,])
+ 
+  maxMLE2 <- constrOptim(f = Y2, theta = param, ui = mat, ci = vec, grad = NULL)
+  MLEs[j,1] <- maxMLE2$par[1]
+  MLEs[j,2] <- maxMLE2$par[2]
+  cat(j, "\n")
+}
+ 
+colnames(MLEs) <- c("Mu", "Sigma")
+hist(MLEs[,1], breaks = 50, main = "histogram of Mu", xlab = "Mu")
+hist(MLEs[,2], breaks = 50, main = "histogram of Sigma", xlab = "Sigma")
+ 
+Mu <- mean(MLEs[,1])
+Sig <- mean(MLEs[,2])
+ 
+sortMu <- sort(MLEs[,1])
+sortSigma <- sort(MLEs[,2])
+ 
+MuLower <- sortMu[25]
+MuUpper <- sortMu[975]
+SigLower <- sortSigma[25]
+SigUpper <- sortSigma[975]
+ 
+CIMu <- c(sortMu[25], Mu,sortMu[975])
+CISigma <- c(sortSigma[25], Sig,sortSigma[975])
+ 
+CIs <- rbind(CIMu, CISigma)
+colnames(CIs) <- c("Lower", "Mean", "Upper")
+CIs
+ 
+##problem 3
+## enter parameters
+witching <- 30
+e <- 0.1
+stdev <- 0.30
+dT <- (e)^2/(stdev * 5)^2
+ 
+##create Asian Option Function
+AO <- function(t, delT = dT, s0 = 8, mu = -0.045, sdev = 0.30){
+  
+  runs <- t/delT + 1
+  strike <- 10
+  
+  ##create rand walk variables
+  B <- cumsum(rnorm(n = runs, mean = 0, sd = sqrt(delT)))
+  
+  #Price function for option
+  time <- seq(from = 0, to = 30, by = delT)
+  Price <- function(i) s0 * exp(mu * time[i] + sdev * B[i]) - strike
+  #sum over runs
+  out <- sapply(1:(runs-1), Price)
+  
+  #sum pos values
+  over.strike <- function(i) max(0,out[i])
+  St <- sapply(1:(runs-1),over.strike) 
+  
+  return(sum(dT * St)/witching)
+  }
+ 
+C <- rep(NA, 2e4)
+for (j in 1:length(C)){
+  C[j] <- AO(witching)
+  cat(j, "\n")
+}
+ 
+hist(C, breaks = 5000, xlim = c(0,5), main = "Histogram of Price of Call", xlab = "Dollar Value")
+ 
+avg.price <- sum(C)/j
+ 
+##avg.price
+##[1] 2.80229
