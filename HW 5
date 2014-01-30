@@ -1,0 +1,379 @@
+#HW 5
+#Problem 1
+#part b
+
+deg <- 1
+n <- 10000
+Sigma <- matrix(c(.675,.444,.444,.755), nrow = 2, ncol = 2)
+W <- eigen(Sigma)$vectors
+Q <- rbind(W[,1],W[,2])
+
+lambda1 <- sqrt(eigen(Sigma)$values[1])
+lambda2 <- sqrt(eigen(Sigma)$values[2])
+multivar <- matrix(data = NA, nrow = n, ncol = 2)
+
+for (j in 1:n){
+  norm1 <- rnorm(1, mean = 0, sd = 1)
+  norm2 <- rnorm(1, mean = 0, sd = 1)
+  lamnorm1 <- lambda1 * norm1
+  lamnorm2 <- lambda2 * norm2
+  lamvec <- rbind(lamnorm1, lamnorm2)
+  multivar[j,] <- Q %*% lamvec
+}
+
+testStat <- rep(NA,n)
+for (i in 1:n){
+  testStat[i] <- (multivar[i,1])^2 + (multivar[i,2])^2
+}
+
+colnames(multivar) <- c("Point 1", "Point 2")
+
+pVal <- rep(NA,n)
+for (k in 1:n){
+pVal[k] <- (pchisq(testStat[k], df = deg))
+}
+
+multivar <- cbind(multivar, testStat, pVal)
+hist(multivar[,4], breaks = 100,  main = "P Value histogram", xlab = "p-value", ylab = "Frequency")
+
+
+####################
+#MLE Calculation####
+####################
+
+
+#Problem 3
+#total runs 
+set.seed(100)
+n <- 1000
+X <- rep(NA, n)
+
+for (i in 1:n){
+  x <- runif(1) 
+  if(x <= .70){X[i] = rnorm(1, mean = 1, sd = sqrt(1))
+  } else {
+    X[i] = rnorm(1, mean = 6, sd = sqrt(1.5))
+  }  
+}  
+
+##set variables to make functions less messy
+sd1 <- 1
+sd2 <- 1.5
+prob1 <- 0.70
+prob2 <- 0.30
+prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+two_sd1 <- 2*1
+two_sd2 <- 2*1.5
+alpha <- 1
+mu <- c(0,0)
+eps <- 1e-6
+
+points <- c()
+
+norm1 <- function(mu1,mu2){
+  lognorm <- rep(NA,n)
+  
+  for (i in 1:n){
+    Xi <- -(((X[i] - mu1)^2)/two_sd1)
+    Xi2 <- -(((X[i] - mu2)^2)/two_sd2)
+    lognorm[i] <- log(prob1pi_two_sd1*exp(Xi) + prob2pi_two_sd2*exp(Xi2))
+  }
+  return(sum(lognorm))
+
+}
+
+normTwo <- norm1(mu[1],mu[2])
+
+###likelihood functions####
+
+## create gradient
+
+#derivative mu1
+
+dmu1 <- function(mu1,mu2){
+  like1 <- rep(NA, n)
+  for (j in 1:n){
+    Xisq <- -(((X[j] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[j] - mu2)^2)/two_sd2)
+    Xi <- (X[j] - mu1)/sd1
+    like1[j] <-  (prob1pi_two_sd1*exp(Xisq) * Xi) / (prob1pi_two_sd1*exp(Xisq) + prob2pi_two_sd2*exp(Xi2sq))  
+  }
+  return(sum(like1))
+}
+
+#derivative mu2
+
+dmu2 <- function(mu1,mu2){
+  like2 <- rep(NA, n)
+  for (k in 1:n){
+    Xisq <- -(((X[k] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[k] - mu2)^2)/two_sd2)
+    Xi2 <- (X[k] - mu2)/sd2
+    like2[k] <- (prob1pi_two_sd1*exp(Xi2sq) * Xi2) / (prob1pi_two_sd1*exp(Xisq) + prob2pi_two_sd2*exp(Xi2sq))
+  }
+  return(sum(like2))
+}
+
+
+while(alpha > eps){
+  
+  ##find direction of greatest ascent
+  normOne <- normTwo
+  gX <- c(dmu1(mu[1],mu[2]),dmu2(mu[1],mu[2]))
+  len <- norm(as.matrix(gX), type = "F")
+  pX <- gX/len
+  
+  ## make new point to test
+  muNew <- mu + alpha*pX
+  normTwo <- norm1(muNew[1], muNew[2])
+
+  ##test if new point improves on old point
+  while (normTwo <= normOne){
+    alpha <- alpha/2;
+    muNew <- mu + alpha*pX;
+    normTwo <- norm1(muNew[1], muNew[2]);
+  }
+  
+  mu <- muNew;
+  new <- c(mu[1], mu[2], normTwo, normOne, alpha);      
+  points <- rbind(points, new);
+  if(alpha < eps){stop("Algo Coverged.")};
+  cat(new, "\n")
+  flush.console();
+
+}
+
+colnames(points) = c("mu1","mu2","Norm After", "Norm Before", "Alpha Used")
+
+##problem 3c
+
+##Hessian
+sd1 <- 1
+sd2 <- 1.5
+prob1 <- 0.70
+prob2 <- 0.30
+prob1pi_two_sd1 <- prob1/sqrt(pi*2*1)
+prob2pi_two_sd2 <- prob2/sqrt(pi*2*1.5)
+two_sd1 <- 2*1
+two_sd2 <- 2*1.5
+invSig1 <- 1/sd1
+invSig2 <- 1/sd2
+
+dmu1sq <- function(mu1, mu2){
+  
+  num <- rep(NA, n)
+  
+  for (j in 1:n){
+  Xi <- (X[j] - mu1)/sd1
+  Xi2 <- (X[j])
+  Xisq <- -(((X[j] - mu1)^2)/two_sd1)
+  Xi2sq <- -(((X[j] - mu2)^2)/two_sd2)
+  
+  num[j] <- ((prob1pi_two_sd1 *exp(Xisq)* Xi)^2 / (prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)^2)) +
+  (prob1pi_two_sd1 * exp(Xisq) * invSig1 * Xi^2 * prob1pi_two_sd1 * exp(Xi) / (prob1pi_two_sd1 * exp(Xisq) + 
+   prob2pi_two_sd2 * exp(Xi2sq))^2)  
+  }
+  return(sum(num))
+} 
+
+dmu2sq <- function(mu1, mu2){
+  
+  num2 <- rep(NA, n)
+  for (k in 1:n){
+    Xi <- (X[k] - mu1) / sd1
+    Xi2 <- (X[k] - mu2) / sd2
+    Xisq <- -(((X[k] - mu1)^2) / two_sd1)
+    Xi2sq <- -(((X[k] - mu2)^2) / two_sd2)
+    
+    num2[k] <- ((prob2pi_two_sd2 *exp(Xi2sq) * Xi2)^2 / (prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)^2)) +
+      (prob2pi_two_sd2 * exp(Xi2sq) * invSig2 * Xi2^2 * prob2pi_two_sd2 * exp(Xi2) / (prob1pi_two_sd1 * exp(Xisq) + 
+         prob2pi_two_sd2 * exp(Xi2sq))^2)  
+  }
+  return(sum(num2))
+} 
+
+dmu12 <- function(mu1, mu2){
+  
+  num3 <- rep(NA, n)
+  for (w in 1:n){
+    Xi <- (X[w] - mu1) / sd1
+    Xi2 <- (X[w] - mu2) / sd2
+    Xisq <- -(((X[w] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[w] - mu2)^2)/two_sd2)
+    
+    num3[w] <- (prob1pi_two_sd1 * exp(Xisq) * Xi *prob2pi_two_sd2 * exp(Xi2sq) * Xi2) / (prob1pi_two_sd1 * exp(Xisq) + prob2pi_two_sd2 * exp(Xi2sq))
+  }
+  return(sum(num3))
+}
+
+
+#part iii
+mu <- c(0.9992, 6.0525)
+
+Hess <- matrix(c(dmu1sq(mu[1],mu[2]), dmu12(mu[1],mu[2]), dmu12(mu[1],mu[2]), dmu2sq(mu[1],mu[2])), nrow = 2, ncol = 2)
+
+ginv(Hess/n)
+
+##parts i and ii 
+
+dmu1sq2 <- function(mu1, mu2){
+  
+    Xi <- (X[p] - mu1)/sd1
+    Xi2 <- (X[p])
+    Xisq <- -(((X[p] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[p] - mu2)^2)/two_sd2)
+    
+    num  <- ((prob1pi_two_sd1 *exp(Xisq)* Xi)^2 / (prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)^2)) +
+      (prob1pi_two_sd1 * exp(Xisq) * invSig1 * Xi^2 * prob1pi_two_sd1 * exp(Xi) / (prob1pi_two_sd1 * exp(Xisq) + 
+         prob2pi_two_sd2 * exp(Xi2sq))^2)  
+  
+    return(num)
+  
+} 
+
+dmu2sq2 <- function(mu1, mu2){
+  
+    Xi <- (X[p] - mu1) / sd1
+    Xi2 <- (X[p] - mu2) / sd2
+    Xisq <- -(((X[p] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[p] - mu2)^2)/two_sd2)
+    
+    num2 <- ((prob2pi_two_sd2 *exp(Xi2sq) * Xi2)^2 / (prob1pi_two_sd1 * exp(Xi2sq) + prob2pi_two_sd2 * exp(Xi2sq)^2)) +
+      (prob2pi_two_sd2 * exp(Xi2sq) * invSig2 * Xi2^2 * prob2pi_two_sd2 * exp(Xi2) / (prob1pi_two_sd1 * exp(Xisq) + 
+         prob2pi_two_sd2 * exp(Xi2sq))^2)  
+
+    return(num2)
+
+} 
+
+dmu122 <- function(mu1, mu2){
+  
+    Xi <- (X[p] - mu1) / sd1
+    Xi2 <- (X[p] - mu2) / sd2
+    Xisq <- -(((X[p] - mu1)^2)/two_sd1)
+    Xi2sq <- -(((X[p] - mu2)^2)/two_sd2)
+    
+    num3 <- (prob1pi_two_sd1 * exp(Xisq) * Xi *prob2pi_two_sd2 * exp(Xi2sq) * Xi2) / (prob1pi_two_sd1 * exp(Xisq) + prob2pi_two_sd2 * exp(Xi2sq))
+
+    return(num3)
+
+}
+
+Hess2 <- matrix(data = NA, nrow = n, ncol = 4)
+
+for (p in 1:n){
+  
+  Hess2[p,1] <- dmu1sq2(mu[1],mu[2]) 
+  Hess2[p,2] <- dmu122(mu[1],mu[2])
+  Hess2[p,3] <- dmu122(mu[1],mu[2])
+  Hess2[p,4] <- dmu2sq2(mu[1],mu[2])
+
+}
+
+#part i
+mu <- c(1,6)
+Hessi <- matrix(NA, nrow = 2, ncol = 2)
+Hessi[1,1] <- mean(Hess2[,1])
+Hessi[1,2] <- mean(Hess2[,2])
+Hessi[2,1] <- mean(Hess2[,3])
+Hessi[2,2] <- mean(Hess2[,4])
+ginv(Hessi)
+
+#part ii
+mu <- c(0.9992, 6.0525)
+Hessii <- matrix(NA, nrow = 2, ncol = 2)
+Hessii[1,1] <- mean(Hess2[,1])
+Hessii[1,2] <- mean(Hess2[,2])
+Hessii[2,1] <- mean(Hess2[,3])
+Hessii[2,2] <- mean(Hess2[,4])
+ginv(Hessii)
+
+#part c
+eigen(Hessii)$values
+eigen(Hessii)$vectors
+ginv(eigen(Hessii)$vectors)
+
+chi <- ((mu[1]-1)/1)^2+((mu[2]-6)/6)^2
+pchisq(chi,1)
+
+#problem 4
+#part a
+rho <- .1
+P <- matrix(c((1-3*rho),rho, 2*rho, rho, (1-5*rho), 4*rho, 2*rho, 4*rho, (1-6*rho)), nrow = 3, ncol = 3)
+P
+P %^% 100
+
+rho2 <- 0.01
+P2 <- matrix(c((1-3*rho2),rho2, 2*rho2, rho2, (1-5*rho2), 4*rho2, 2*rho2, 4*rho2, (1-6*rho2)), nrow = 3, ncol = 3)
+P2
+P2 %^% 100
+
+rho3 <- 0.0001
+P3 <- matrix(c((1-3*rho3),rho3, 2*rho3, rho3, (1-5*rho3), 4*rho3, 2*rho3, 4*rho3, (1-6*rho3)), nrow = 3, ncol = 3)
+P3
+P3 %^% 100000
+
+eigen(P)$values
+eigen(P)$vectors
+
+eigen(P2)$values
+eigen(P2)$vectors
+
+eigen(P3)$values
+eigen(P3)$vectors
+
+vec <- -1.732051 * eigen(P)$vectors
+ginv(vec)
+
+vec2 <- -1.732051 * eigen(P2)$vectors
+ginv(vec2)
+
+vec3 <- -1.732051 * eigen(P3)$vectors
+ginv(vec3)
+
+##stationary probabilities all .33
+
+##part b
+relax1 <- 1/(1-eigen(P)$values[2])
+relax2 <- 1/(1-eigen(P2)$values[2])
+relax3 <- 1/(1-eigen(P3)$values[2])
+relax1
+##[1] 2.296607
+relax2
+##[1] 22.96607
+relax3
+##[1] 2296.607
+
+##Markov Chain Histogram
+
+Marky <- function(T,Pmat,X_naught){
+  n <- 1000
+  state <- X_naught;
+  collect_states <- c()
+  last_state <- c()
+  
+  ##run markov 1000 times to get histogram of state
+  for (i in 1:n){
+  
+  # Make T steps through the markov chain
+  for (j in 1:T){
+    new_State <- sample(1:ncol(P), 1, prob = P[state,]);
+    state <- new_State;
+    collect_states[j] <- state
+  }
+
+  last_state <- rbind(last_state, tail(collect_states)); 
+  collect_states <- c();
+  flush.console()
+  }
+  
+  plot(table(last_state), type = "h", main = "Histrogram of State Space", ylab = "Last State Space at Relax Time (a*Tau)", xlab = "Total Count at that State")
+  return(table(last_state))
+}
+
+a = 1
+relax = relax1
+relax_time = round(a*relax3,0)
+init_state = 1
+Marky(relax_time,P,init_state)
