@@ -1,0 +1,148 @@
+##Homework 9
+##Problem 1
+##part a
+
+runs <- 1e4
+hiddenMarkov <- function(n){
+  collectStates <- matrix(data = NA, nrow = runs, ncol = 2)
+  currState <- 1
+
+  for(j in 1:runs){ 
+    if (currState == 1){
+      currState <- rbinom(1, 1, prob = .99)
+      currState <- ifelse(currState == 0, 2, 1)
+        } else {
+          currState <- rbinom(1, 1, prob = .01)
+          currState <- ifelse(currState == 0, 2, 1)
+    }
+    
+    if (currState == 1){
+    samp <- sample(1:6, 1)
+    } else {
+      U <- runif(1);
+      if (U <= 0.0625){
+        samp = 6
+      } else {
+        samp <- sample(1:5, 1)
+      }
+    }
+    collectStates[j,1] <- samp
+    collectStates[j,2] <- currState
+  }
+  colnames(collectStates) <- c("Current Roll", "Current State")
+  return(collectStates)
+}
+
+marky <- hiddenMarkov(runs)
+table(marky[,1])
+table(marky[,2])
+
+
+##part d
+switches <- 1.5e6
+column2 <- rep(1, nrow(marky))
+marky2 <- cbind(marky[,1], column2) 
+colnames(marky2) <- c("Current Roll", "Current State")
+fairProb <- c(rep(1/6,6))
+cheatProb <- c(3/16, 3/16, 3/16, 3/16, 3/16, 1/16)
+probMat <- rbind(fairProb, cheatProb)
+tMat <- matrix(data = c(0.99, 0.01), nrow = 1, ncol = 2)
+accept <- 0
+collectMeans <- matrix(data = NA, nrow = switches, ncol = 2)
+colnames(collectMeans) <- c("Percent Casino Fair", "Percent Casino Cheating")
+
+for (num in 1:switches){
+  
+  logU <- log(runif(1))
+  W <- sample(2:10000, 1)
+  old <- marky2[W,]
+   	
+  switcheroo <- ifelse(old[2] == 1, 2, 1)
+  prop <- c(old[1], switcheroo)
+  probtMat1 <- ifelse(old[2] == marky2[W-1, 2], tMat[1], tMat[2]) 
+  probtMat2 <-	ifelse(prop[2] == marky2[W-1, 2], tMat[1], tMat[2])
+  oldLike <- log(probMat[old[2],old[1]]) + log(probtMat1)
+  newLike <- log(probMat[prop[2],prop[1]]) + log(probtMat2)
+
+  if(logU < min(1, newLike - oldLike)){
+	marky2[W,] <- prop
+	accept <- accept + 1
+	} else {
+	marky2[W,] <- old
+  }
+  cat(num, "\n")
+  collectMeans[num, 1] <- sum(marky2[,2][marky2[,2] == 1])/nrow(marky2) 
+  collectMeans[num, 2] <- 1 - collectMeans[num, 1]
+}
+
+accpct <- accept/num
+plot(collectMeans[,2], type = "l", main = "Metropolis Hastings Cheating Casino", ylab = "Pct Time Casino Cheating", xlab = "Iterations")
+
+##problem 2
+## part b
+require(msm)
+Alpha <- 0.50
+flips <- 1
+runs <- 5e3
+
+Metro <- function(alph, mat, point, total){
+  
+  alphaCalc.1 <- rep(NA, nrow(mat))
+  alphaCalc.2 <- rep(NA, nrow(mat))
+  
+  fairProb <- c(rep(1/6,6))
+  cheatProb <- c(rep(3/16, 5), 1/16)
+  probMat <- rbind(fairProb, cheatProb)
+  iteration <- rep(NA, total)
+  
+  for(w in 1:total){
+  
+  flip <- sample(2:10000, point)
+  mat2 <- mat
+  
+  newalph <- runif(1)
+  logU <- log(runif(1))
+  
+  oldlist <- (mat[flip,2])
+  newlist <- ifelse(mat[flip,2] == 1, 2 ,1)  
+  mat2[flip, 2] <- newlist
+  
+  Gx.s <- rep(NA, length(oldlist))
+  Gx.z <- rep(NA, length(newlist))
+  
+  alphaCalc.1[1] <- alph
+  alphaCalc.2[1] <- newalph
+  
+  for(i in 2:nrow(mat)){
+    alphaCalc.1[i] <- ifelse(mat[i,2] == mat[i-1, 2], alph, 1-alph) 
+    alphaCalc.2[i] <- ifelse(mat2[i,2] == mat2[i-1, 2], newalph, 1 - newalph)
+  }
+  
+  for(j in 1:length(oldlist)){
+    Gx.s[j] <- ifelse(oldlist[j] == 1, probMat[1,oldlist[j]], probMat[2, oldlist[j]]) 
+    Gx.z[j] <- ifelse(newlist[j] == 1, probMat[1,newlist[j]], probMat[2,newlist[j]])
+  }
+ 
+  prod.1 <- sum(log(alphaCalc.1))
+  prod.2 <- sum(log(alphaCalc.2))
+  prod.3 <- sum(log(Gx.s))
+  prod.4 <- sum(log(Gx.z))
+    
+  like.1 <- prod.1 + prod.3
+  like.2 <- prod.2 + prod.4
+  
+  if(logU < min(1, like.1 - like.2)){
+    mat[flip,2] <- mat[newlist,2];
+    alph <- newalph
+    } else {
+    alph <- alph
+    }
+  iteration[w] <- alph
+  cat(w, "\n")
+  }
+  return(iteration)
+}
+
+alphaList <- as.matrix(Metro(Alpha, marky, flips, runs))
+colnames(alphaList) <- c("Current Alpha")
+plot(alphaList, type = "l", main = "Problem 3b/c Current Alpha", xlab = "Iteration", ylab = "Alpha")
