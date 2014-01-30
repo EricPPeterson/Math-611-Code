@@ -1,0 +1,226 @@
+##HW 7 
+#problem 2
+#part a
+
+##function to assign neighbors to check
+neighbors <- function(x, y, lim){  
+  # The "lim" parameter assumes a square matrix and represents the length  
+  # of one side of our grid.  
+  x.n <- sapply(c(-1,0,1),function(i)x+i)  
+  y.n <- sapply(c(-1,0,1),function(i)y+i)  
+  x.n <- x.n[0 < x.n & x.n <= lim]  
+  y.n <- y.n[0 < y.n & y.n <= lim]  
+  G <- rbind(expand.grid(x, y.n), expand.grid(x.n, y))  
+  as.matrix(G[G[,1]!= x | G[,2]!= y ,])} 
+
+##function to decide if those neighbors are occupied
+occupied <- function(M, x, y){  
+  G <- neighbors(x,y, lim = nrow(M))  
+  ifelse(any(M[G] == 1), F, T)}
+
+
+
+n <- 2e4
+Sums <- matrix(data = 0, ncol = 1, nrow = n)
+colnames(Sums) <- c("Overall Mean")
+accepted = 0
+rejected = 0
+runs = 10
+steady <- matrix(data = NA, nrow = runs, ncol = 2)
+steady2 <- matrix(data = NA, nrow = runs, ncol = 2)
+steady3 <- matrix(data = NA, nrow = runs, ncol = 2)
+
+colnames(steady3) <- c("Steady State", "Accepted Percentage")
+
+mat <- matrix(data = 1, nrow = 500, ncol = 500)
+mat.2 <- mat
+
+for (q in 1:runs){
+  for (z in 1:n){
+  
+    U <- runif(1)
+    W <- rbinom(1, 10, .1)
+  
+    x <- sample(1:dim(mat.2)[1], W)
+    y <- sample(1:dim(mat.2)[2], W)
+  
+    for (k in 1:W){
+      if (mat.2[x[k],y[k]] == 1){ mat.2[x[k],y[k]] = 0}
+    
+      if(mat.2[x[k],y[k]] == 0 & occupied(mat.2,x[k],y[k]) ==  TRUE) {
+        mat[x[k],y[k]] = 1
+      }
+    }
+      diff <- (-sum(mat.2) + sum(mat))
+      if (U < min(1, exp(-diff))){
+        mat.2 <- mat;
+        accepted = accepted + 1
+      } else {
+        mat <- mat.2;
+        rejected = rejected + 1
+      }
+      Sums[z,1] <- sum(mat)
+      cat (z, "|", q, "\n")
+  }
+
+steady3[q,] <- c(sum(mat)/(500^2), accepted/z)
+accepted = 0
+rejected = 0
+
+}
+
+##mean and sd
+steadystate <- rbind(steady, steady2, steady3)
+write.csv(steadystate, "C:/Users/eric/Desktop/GTown Stats/math 611/steadystate.csv")
+plot(steadystate[,1], main = "Steady State Analysis", 
+     xlab = "Runs", ylab = "Percentages")
+
+##image
+image(mat.2 * 128, main = "Final State Proposal")
+
+
+
+#problem 3
+#part a
+df = data.frame(black=c(68,20,15,5)
+                ,brunette=c(119,84,54,29)
+                ,red=c(26,17,14,14)
+                ,blond=c(7,94,10,16)
+                ,row.names=c("brown","blue","hazel","green")
+)
+
+chi_test <- chisq.test(df)
+chi_test
+
+##output
+##Pearson's Chi-squared test
+##data:  df
+##X-squared = 138.2898, df = 9, p-value < 2.2e-16
+
+#part b
+contingency <- function(d){
+  x <- sample(1:4, 2, replace = FALSE);
+  y <- sample(1:4, 2, replace = FALSE)
+  
+  if(d[x[1],y[2]] - 1 & d[x[2],y[1]] - 1 > 0) {
+
+    d[x[1],y[1]] = d[x[1],y[1]] + 1
+    d[x[1],y[2]] = d[x[1],y[2]] - 1
+    d[x[2],y[1]] = d[x[2],y[1]] - 1
+    d[x[2],y[2]] = d[x[2],y[2]] + 1
+  } else if (d[x[1],y[1]] - 1 & d[x[2],y[2]] - 1 > 0) {
+    d[x[1],y[1]] = d[x[1],y[1]] - 1
+    d[x[1],y[2]] = d[x[1],y[2]] + 1
+    d[x[2],y[1]] = d[x[2],y[1]] + 1
+    d[x[2],y[2]] = d[x[2],y[2]] - 1
+  } else {
+    x <- sample(1:4, 2, replace = FALSE);
+    y <- sample(1:4, 2, replace = FALSE)
+  }
+  
+  return(d)  
+}
+
+
+calc.chi <- function(d){
+  
+  E1 <- (sum(d[1,]) * sum(d[,1])) / 592
+  E2 <- (sum(d[1,]) * sum(d[,2])) / 592
+  E3 <- (sum(d[1,]) * sum(d[,3])) / 592
+  E4 <- (sum(d[1,]) * sum(d[,4])) / 592
+  E5 <- (sum(d[2,]) * sum(d[,1])) / 592
+  E6 <- (sum(d[2,]) * sum(d[,2])) / 592
+  E7 <- (sum(d[2,]) * sum(d[,3])) / 592
+  E8 <- (sum(d[2,]) * sum(d[,4])) / 592
+  E9 <- (sum(d[3,]) * sum(d[,1])) / 592
+  E10 <- (sum(d[3,]) * sum(d[,2])) / 592
+  E11 <- (sum(d[3,]) * sum(d[,3])) / 592
+  E12 <- (sum(d[3,]) * sum(d[,4])) / 592
+  E13 <- (sum(d[4,]) * sum(d[,1])) / 592
+  E14 <- (sum(d[4,]) * sum(d[,2])) / 592
+  E15 <- (sum(d[4,]) * sum(d[,3])) / 592
+  E16 <- (sum(d[4,]) * sum(d[,4])) / 592
+  
+  chi <- (d[1,1] - E1)^2 / E1 + (d[1,2] - E2)^2 / E2 + (d[1,3] - E3)^2 / E3 + (d[1,4] - E4)^2 / E4 + 
+          (d[2,1] - E5)^2 / E5 + (d[2,2] - E6)^2 / E6 + (d[2,3] - E7)^2 / E7 + (d[2,4] - E8)^2 / E8 + 
+          (d[3,1] - E9)^2 / E9 + (d[3,2] - E10)^2 / E10 + (d[3,3] - E11)^2 / E11 + (d[3,4] - E12)^2 / E12 + 
+          (d[4,1] - E13)^2 / E13+ (d[4,2] - E14)^2  / E14 + (d[4,3] - E15)^2 / E15 + (d[4,4] - E16)^2 / E16
+  return(chi)
+  
+}
+
+n <- 1e5
+values <- matrix(data = NA, nrow = n, ncol = 1)
+colnames(values) <- c("X Squared Value")
+for (i in 1:n){
+  df <- contingency(df)
+  values[i,1] <- calc.chi(df) 
+  cat(i, "\n")
+}
+
+hist(values, breaks = 100, main = "Histogram of Chi Squared Stat", ylab = "Frequency", xlab = "X Sq Stat")
+write.csv(values, "C:/Users/petersone/Desktop/values.csv")
+
+#problem 4
+#part a
+JumpTime <- function(t){
+  a <- 5 * (10^-4)
+  b <- 7.5858 * (10^-5)
+  c <- log(1.09144)
+  r_t <- a + b * exp(c*t)
+  return(r_t)
+}
+
+r <- rep(NA, 200)
+for (j in 1:200){
+  r[j] <- JumpTime(j)
+}
+plot(r, type = "l", main = "r(t) rate for first 200 time periods", ylab = "r(t)", xlab = "iteration")
+
+
+countJumps <- function(n){
+  X <- rep(NA, n)
+  Y <- rep(NA, n)
+  for (i in 1:n){
+    X[i] <- rexp(1)
+  }
+  Y <- cumsum(X)
+  combo <- cbind(X,Y)
+  colnames(combo) <- c("Arrival Time", "Cumulative Arrival Time")
+  return(combo)
+}
+
+#partb
+SamplerJumps <- function(t){
+  X <- c()
+  age <- 0
+  for (i in 1:t) {
+    U <- runif(1, JumpTime(100))
+    X[i] <- rexp(1)
+    Y <- cumsum(X)
+    if (U < JumpTime(i)/JumpTime(100)){
+      age <- Y[i]
+      cat("Age Jump:", age, "\n")
+      }
+    if (age > t){ break }
+}
+}
+
+#part c
+t <- 60
+lam <- seq(from = 1, to = t, by = 0.01)
+PdF <- exp(-lam * t)
+plot(PdF, type = "l", xlim = c(0,60), main = "PDF of Survival Time")
+
+#part d
+success <- function(groupSize){
+  X <- matrix(data = NA, nrow = groupSize, ncol = 2)
+  sucRate <- pexp(1,rate = JumpTime(80)) - pexp(1, rate = JumpTime(25))
+  failRate <- 1 - sucRate
+  for (i in 1:groupSize){
+    X[i,] <- c(i,(factorial(groupSize)/((factorial(i) * factorial(groupSize - i)))) * sucRate^i * failRate^(groupSize - i))
+  }
+  colnames(X) <- c("Total Survived", "Probability")
+  return(X)
+ 
+}
