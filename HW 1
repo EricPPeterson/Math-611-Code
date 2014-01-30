@@ -1,0 +1,132 @@
+## HW Math 611
+#Problem #2c
+
+############
+##Queueing##
+############
+memory.limit(20000)
+
+ServeTime = function(n, lambda, mu){
+  set.seed(1)
+  t = rexp(n, rate = lambda)
+  s = rexp(n, rate = mu)
+  d = c(t[1]+s[1],rep(NA,n-1))
+  w = c(0,rep(NA, n-1))   
+  a = rep(NA, n)
+  a[1] = t[1]
+  
+  for(i in 2:n){
+      a[i] = a[i-1] + t[i]
+  }
+
+  for(i in 2:n){
+    d[i] = max(d[i-1] + s[i],a[i] + s[i])
+    if(d[i-1] < a[i]){
+      w[i] = 0
+    } else {
+      w[i] = d[i] - a[i] - s[i]
+    }   
+  }    
+  time = data.frame(t,s,d,w,a)
+  return(time)
+}
+
+#Part d
+
+MCint = function(x, lam, mu){
+  
+  yea = rep(NA, (x-1))
+  
+  for (i in 1:x-1){
+  arr = rexp(2,lam)
+  serv = rexp(1,mu)
+  
+  if (arr[2] > serv){
+  yea[i] = 1 } else {
+  yea[i] = 0 }
+  }    
+noWait = sum(yea)/(x-1)  
+return(noWait *100)  
+}
+
+#part e
+
+Monty = function(n,m,lambda,mu){
+  time = rep(NA,m)
+  for (j in 1:m){
+  t = rexp(n, rate = lambda)
+  s = rexp(n, rate = mu)
+  d = c(t[1]+s[1],rep(NA,n-1))
+  w = c(0,rep(NA, n-1))   
+  a = rep(NA, n)
+  a[1] = t[1]
+
+  for(i in 2:101){
+    a[i] = a[i-1] + t[i]
+  }
+  
+  for(i in 2:n){
+  d[i] = max(d[i-1] + s[i],a[i] + s[i])
+  if(d[i-1] < a[i]){
+    w[i]<-0
+  } else {
+    w[i] = d[i] - a[i] - s[i]
+  }   
+  }    
+  time[j] = w[n]
+}
+return(mean(time))
+}
+
+#problem 3
+
+sample = function(n, a, p = NA, iters = 1){   
+  if (sum(p) != 1) { stop("probabilites must add to one") }
+  P = cumsum(p)
+  
+  ##collect_nums = matrix(NA, iters, n)
+  for (i in 1:iters){
+    U = sort(runif(n))
+    collect_row = findInterval(U,P)
+    ##collect_nums[i,] = collect_row
+    } 
+  return(collect_row)
+}  
+
+# CPU test
+start_time = Sys.time()
+Time_test = sample(5000, c(0,1), c(.2,.8), iters=1e6)  
+(time_CPU = Sys.time()-start_time)
+##Time difference of 10.83929 mins
+
+
+##problem 4
+n = 100000
+m = runif(n, 0, 1)
+
+Z = function(n){
+  m^(1/n)
+}
+
+X <- Z(n)
+plot(density(X), ylab = "Density", xlab = "range", title = "Density of Z")
+
+##problem 5
+##define function to integrate
+
+##part a
+integrand = function(z){
+  x = runif(1)
+  pnorm(z) - x
+}
+
+collect = matrix(NA, 1e4, 1)
+
+#part b
+for (i in 1:1e4){
+  root = uniroot(integrand, c(-10,10), maxiter = 1000, tol = 1e-9)
+  collect[i,1] = root$root
+}
+
+plot(density(collect, na.rm = TRUE), main = "Normal sampler versus R Normal sd = 1")
+lines(density(rnorm(1e7, mean = 0, sd = 0.6)), col = "red")
